@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GSAP Image Gallery Viewer</title>
+    <link rel="stylesheet" href="gallery-viewer.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>GSAP Image Gallery</h1>
+        <div class="gallery-container">
+            <svg class="connection-svg" id="connection-svg">
+            </svg>
+            <div class="gallery-circle">
+                <div class="gallery-item" data-image="https://picsum.photos/600/600?random=1">
+                    <img src="https://picsum.photos/600/600?random=1" alt="Gallery Image 1">
+                </div>
+                <div class="gallery-item" data-image="https://picsum.photos/600/600?random=2">
+                    <img src="https://picsum.photos/600/600?random=2" alt="Gallery Image 2">
+                </div>
+                <div class="gallery-item" data-image="https://picsum.photos/600/600?random=3">
+                    <img src="https://picsum.photos/600/600?random=3" alt="Gallery Image 3">
+                </div>
+                <div class="gallery-item" data-image="https://picsum.photos/600/600?random=4">
+                    <img src="https://picsum.photos/600/600?random=4" alt="Gallery Image 4">
+                </div>
+                <div class="gallery-item" data-image="https://picsum.photos/600/600?random=5">
+                    <img src="https://picsum.photos/600/600?random=5" alt="Gallery Image 5">
+                </div>
+                <div class="gallery-item" data-image="https://picsum.photos/600/600?random=6">
+                    <img src="https://picsum.photos/600/600?random=6" alt="Gallery Image 6">
+                </div>
+                <div class="gallery-item" data-image="https://picsum.photos/600/600?random=7">
+                    <img src="https://picsum.photos/600/600?random=7" alt="Gallery Image 7">
+                </div>
+                <div class="gallery-item" data-image="https://picsum.photos/600/600?random=8">
+                    <img src="https://picsum.photos/600/600?random=8" alt="Gallery Image 8">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="modal">
+        <div class="modal-background"></div>
+        <div class="modal-content">
+            <img id="modal-image" src="" alt="Full Size Image">
+            <button class="close-button" id="close-button">&times;</button>
+        </div>
+    </div>
+
+    <script src="gallery-viewer.js"></script>
+</body>
+</html>
