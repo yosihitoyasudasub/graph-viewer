@@ -1,4 +1,7 @@
 import { GALLERY_CONFIG } from '../core/config.js';
+import { MathUtils } from '../utils/math-utils.js';
+import { AnimationHelpers } from '../utils/animation-helpers.js';
+import { DOMUtils } from '../utils/dom-utils.js';
 
 export class AnimationManager {
   constructor() {
@@ -9,13 +12,29 @@ export class AnimationManager {
    * Initialize GSAP settings for 3D perspective
    */
   setupGSAP() {
-    gsap.set('.gallery-container', {
-      perspective: GALLERY_CONFIG.perspective
-    });
+    try {
+      const galleryContainer = document.querySelector('.gallery-container');
+      if (!galleryContainer) {
+        console.warn('Gallery container not found - 3D perspective will not be applied');
+        return;
+      }
 
-    gsap.set('.gallery-item', {
-      transformStyle: GALLERY_CONFIG.transformStyle
-    });
+      gsap.set('.gallery-container', {
+        perspective: GALLERY_CONFIG.perspective
+      });
+
+      const galleryItems = document.querySelectorAll('.gallery-item');
+      if (galleryItems.length === 0) {
+        console.warn('No gallery items found - transform style will not be applied');
+        return;
+      }
+
+      gsap.set('.gallery-item', {
+        transformStyle: GALLERY_CONFIG.transformStyle
+      });
+    } catch (error) {
+      console.error('Error setting up GSAP initial configuration:', error);
+    }
   }
 
   /**
@@ -23,11 +42,25 @@ export class AnimationManager {
    * @param {NodeList} galleryItems - Gallery item elements
    */
   setTransformOrigins(galleryItems) {
-    galleryItems.forEach((item) => {
-      gsap.set(item, {
-        transformOrigin: "center center"
+    if (!galleryItems || galleryItems.length === 0) {
+      console.warn('No gallery items provided for transform origin setup');
+      return;
+    }
+
+    try {
+      galleryItems.forEach((item, index) => {
+        if (!item) {
+          console.warn(`Gallery item at index ${index} is null or undefined`);
+          return;
+        }
+
+        gsap.set(item, {
+          transformOrigin: "center center"
+        });
       });
-    });
+    } catch (error) {
+      console.error('Error setting transform origins:', error);
+    }
   }
 
   /**
@@ -36,28 +69,56 @@ export class AnimationManager {
    * @param {Function} onCompleteCallback - Callback for animation completion
    */
   animateGalleryItems(galleryItems, onCompleteCallback) {
+    if (!galleryItems || galleryItems.length === 0) {
+      console.warn('No gallery items provided for animation');
+      if (typeof onCompleteCallback === 'function') {
+        onCompleteCallback();
+      }
+      return;
+    }
+
     const totalItems = galleryItems.length;
 
-    galleryItems.forEach((item, index) => {
-      // Calculate final position on circle
-      const angle = (index / totalItems) * Math.PI * 2;
-      const finalX = GALLERY_CONFIG.centerX + GALLERY_CONFIG.radius * Math.cos(angle) - 50;
-      const finalY = GALLERY_CONFIG.centerY + GALLERY_CONFIG.radius * Math.sin(angle) - 50;
+    try {
+      galleryItems.forEach((item, index) => {
+        if (!item) {
+          console.warn(`Gallery item at index ${index} is null or undefined - skipping animation`);
+          return;
+        }
 
-      gsap.to(item, {
-        x: finalX,
-        y: finalY,
-        scale: 1,
-        duration: GALLERY_CONFIG.animation.duration,
-        delay: index * GALLERY_CONFIG.animation.delay,
-        ease: GALLERY_CONFIG.animation.ease,
-        onComplete: () => {
-          if (index === galleryItems.length - 1) {
-            onCompleteCallback();
-          }
+        try {
+          // Calculate final position on circle using MathUtils
+          const position = MathUtils.getItemElementPosition(index, totalItems);
+          const finalX = position.x;
+          const finalY = position.y;
+
+          gsap.to(item, {
+            x: finalX,
+            y: finalY,
+            scale: 1,
+            duration: GALLERY_CONFIG.animation.duration,
+            delay: index * GALLERY_CONFIG.animation.delay,
+            ease: GALLERY_CONFIG.animation.ease,
+            onComplete: () => {
+              if (index === galleryItems.length - 1) {
+                if (typeof onCompleteCallback === 'function') {
+                  onCompleteCallback();
+                } else {
+                  console.warn('onCompleteCallback is not a function');
+                }
+              }
+            }
+          });
+        } catch (animationError) {
+          console.error(`Error animating gallery item at index ${index}:`, animationError);
         }
       });
-    });
+    } catch (error) {
+      console.error('Error in gallery items animation:', error);
+      if (typeof onCompleteCallback === 'function') {
+        onCompleteCallback();
+      }
+    }
   }
 
   /**
@@ -65,55 +126,57 @@ export class AnimationManager {
    * @param {NodeList} galleryItems - Gallery item elements
    */
   setupInitialLayout(galleryItems) {
-    galleryItems.forEach((item) => {
-      gsap.set(item, {
-        x: GALLERY_CONFIG.centerX - 50,
-        y: GALLERY_CONFIG.centerY - 50,
-        rotation: 0,
-        scale: 0
+    if (!galleryItems || galleryItems.length === 0) {
+      console.warn('No gallery items provided for initial layout setup');
+      return;
+    }
+
+    try {
+      const centerOffset = GALLERY_CONFIG.itemSize / 2;
+      galleryItems.forEach((item, index) => {
+        if (!item) {
+          console.warn(`Gallery item at index ${index} is null or undefined - skipping initial layout`);
+          return;
+        }
+
+        try {
+          gsap.set(item, {
+            x: GALLERY_CONFIG.centerX - centerOffset,
+            y: GALLERY_CONFIG.centerY - centerOffset,
+            rotation: 0,
+            scale: 0
+          });
+        } catch (layoutError) {
+          console.error(`Error setting initial layout for item at index ${index}:`, layoutError);
+        }
       });
-    });
+    } catch (error) {
+      console.error('Error in initial layout setup:', error);
+    }
   }
 
   /**
-   * Add hover animation to gallery item
+   * Execute hover animation for gallery item (called by EventManager)
    * @param {HTMLElement} item - Gallery item element
-   * @param {number} index - Item index
-   * @param {Function} onMouseEnter - Mouse enter callback
-   * @param {Function} onMouseLeave - Mouse leave callback
+   * @param {boolean} isHover - Whether entering or leaving hover
    */
-  addHoverAnimation(item, index, onMouseEnter, onMouseLeave) {
-    const img = item.querySelector('img');
+  executeHoverAnimation(item, isHover) {
+    if (!item) {
+      console.warn('Gallery item not provided for hover animation');
+      return;
+    }
 
-    item.addEventListener('mouseenter', () => {
-      gsap.to(item, {
-        scale: GALLERY_CONFIG.hover.scale,
-        duration: GALLERY_CONFIG.animation.modalDuration,
-        ease: GALLERY_CONFIG.animation.modalEase
-      });
+    const img = DOMUtils.querySelector('img', item);
+    if (!img) {
+      console.warn('Image not found in gallery item for hover animation');
+      return;
+    }
 
-      gsap.to(img, {
-        filter: `brightness(${GALLERY_CONFIG.hover.brightness}) saturate(${GALLERY_CONFIG.hover.saturation})`,
-        duration: GALLERY_CONFIG.animation.modalDuration
-      });
-
-      if (onMouseEnter) onMouseEnter(index);
-    });
-
-    item.addEventListener('mouseleave', () => {
-      gsap.to(item, {
-        scale: 1,
-        duration: GALLERY_CONFIG.animation.modalDuration,
-        ease: GALLERY_CONFIG.animation.modalEase
-      });
-
-      gsap.to(img, {
-        filter: "brightness(1) saturate(1)",
-        duration: GALLERY_CONFIG.animation.modalDuration
-      });
-
-      if (onMouseLeave) onMouseLeave(index);
-    });
+    try {
+      AnimationHelpers.animateItemHover(item, img, isHover);
+    } catch (error) {
+      console.error('Error executing hover animation:', error);
+    }
   }
 
   /**
@@ -125,48 +188,79 @@ export class AnimationManager {
    * @param {string} imageUrl - Image URL to display
    */
   openModal(modal, modalBackground, modalImage, clickedItem, imageUrl) {
-    modalImage.src = imageUrl;
+    if (!modal || !modalBackground || !modalImage) {
+      console.error('Modal elements not provided or found');
+      return;
+    }
 
-    gsap.set(modal, { display: 'block' });
-    gsap.set(modalBackground, { opacity: 0 });
-    gsap.set('.modal-content', {
-      opacity: 0,
-      scale: 1,
-      rotation: 0,
-      x: '-50%',
-      y: '-50%',
-      xPercent: 0,
-      yPercent: 0
-    });
+    if (!imageUrl) {
+      console.warn('No image URL provided for modal');
+      return;
+    }
 
-    const tl = gsap.timeline();
+    try {
+      modalImage.src = imageUrl;
 
-    tl.to(modalBackground, {
-      opacity: 1,
-      duration: GALLERY_CONFIG.animation.modalDuration,
-      ease: GALLERY_CONFIG.animation.modalEase
-    })
-    .to('.modal-content', {
-      opacity: 1,
-      x: '-50%',
-      y: '-50%',
-      duration: GALLERY_CONFIG.animation.modalDuration,
-      ease: GALLERY_CONFIG.animation.modalEase
-    }, "-=0.1");
-
-    // Animate clicked item
-    gsap.to(clickedItem, {
-      scale: 0.8,
-      duration: 0.2,
-      ease: "power2.inOut",
-      onComplete: () => {
-        gsap.to(clickedItem, {
-          scale: 1,
-          duration: 0.2,
-          ease: "power2.out"
-        });
+      // Verify modal content element exists
+      const modalContent = document.querySelector('.modal-content');
+      if (!modalContent) {
+        console.error('Modal content element not found');
+        return;
       }
-    });
+
+      gsap.set(modal, { display: 'block' });
+      gsap.set(modalBackground, { opacity: 0 });
+      gsap.set('.modal-content', {
+        opacity: 0,
+        scale: 1,
+        rotation: 0,
+        x: '-50%',
+        y: '-50%',
+        xPercent: 0,
+        yPercent: 0
+      });
+
+      // Use AnimationHelpers for modal timeline
+      const elements = {
+        modal,
+        background: modalBackground,
+        content: '.modal-content'
+      };
+
+      try {
+        AnimationHelpers.createModalTimeline(elements, true);
+      } catch (timelineError) {
+        console.error('Error creating modal timeline:', timelineError);
+        // Fallback: just show modal without animation
+        modal.style.display = 'block';
+        modalBackground.style.opacity = '1';
+        modalContent.style.opacity = '1';
+      }
+
+      // Animate clicked item with helper
+      if (clickedItem) {
+        try {
+          AnimationHelpers.scaleToValue(clickedItem, GALLERY_CONFIG.animation.itemClickScale, {
+            duration: GALLERY_CONFIG.animation.itemClickDuration,
+            ease: "power2.inOut",
+            onComplete: () => {
+              try {
+                AnimationHelpers.scaleToValue(clickedItem, 1, {
+                  duration: GALLERY_CONFIG.animation.itemClickDuration,
+                  ease: "power2.out"
+                });
+              } catch (scaleBackError) {
+                console.error('Error scaling item back:', scaleBackError);
+              }
+            }
+          });
+        } catch (scaleError) {
+          console.error('Error scaling clicked item:', scaleError);
+        }
+      }
+    } catch (error) {
+      console.error('Error opening modal:', error);
+    }
   }
 
   /**
@@ -175,21 +269,37 @@ export class AnimationManager {
    * @param {HTMLElement} modalBackground - Modal background element
    */
   closeModal(modal, modalBackground) {
-    const tl = gsap.timeline();
+    if (!modal || !modalBackground) {
+      console.error('Modal elements not provided for closing');
+      return;
+    }
 
-    tl.to('.modal-content', {
-      scale: 0.5,
-      opacity: 0,
-      rotation: 10,
-      duration: GALLERY_CONFIG.animation.modalDuration,
-      ease: "power2.in"
-    })
-    .to(modalBackground, {
-      opacity: 0,
-      duration: 0.2,
-      ease: "power2.in"
-    }, "-=0.1")
-    .set(modal, { display: 'none' });
+    try {
+      const modalContent = document.querySelector('.modal-content');
+      if (!modalContent) {
+        console.warn('Modal content not found - closing without animation');
+        modal.style.display = 'none';
+        return;
+      }
+
+      const elements = {
+        modal,
+        background: modalBackground,
+        content: '.modal-content'
+      };
+
+      try {
+        AnimationHelpers.createModalTimeline(elements, false);
+      } catch (timelineError) {
+        console.error('Error creating modal close timeline:', timelineError);
+        // Fallback: just hide modal
+        modal.style.display = 'none';
+      }
+    } catch (error) {
+      console.error('Error closing modal:', error);
+      // Fallback: force close
+      modal.style.display = 'none';
+    }
   }
 
   /**
@@ -198,19 +308,28 @@ export class AnimationManager {
    * @param {number} delay - Animation delay
    */
   animatePathStroke(pathElement, delay = 0) {
-    const length = pathElement.getTotalLength();
+    if (!pathElement) {
+      console.warn('Path element not provided for stroke animation');
+      return;
+    }
 
-    gsap.set(pathElement, {
-      strokeDasharray: `${length} ${length}`,
-      strokeDashoffset: length
-    });
+    try {
+      const length = pathElement.getTotalLength();
 
-    gsap.to(pathElement, {
-      strokeDashoffset: 0,
-      duration: 1.5,
-      ease: "power2.out",
-      delay: 0.5 + delay
-    });
+      gsap.set(pathElement, {
+        strokeDasharray: `${length} ${length}`,
+        strokeDashoffset: length
+      });
+
+      gsap.to(pathElement, {
+        strokeDashoffset: 0,
+        duration: GALLERY_CONFIG.animation.pathStrokeDuration,
+        ease: "power2.out",
+        delay: 0.5 + delay
+      });
+    } catch (error) {
+      console.error('Error animating path stroke:', error);
+    }
   }
 
   /**
@@ -219,11 +338,25 @@ export class AnimationManager {
    * @param {Object} targetState - Target visual state
    */
   animatePathState(pathElement, targetState) {
-    gsap.to(pathElement, {
-      opacity: targetState.opacity,
-      duration: GALLERY_CONFIG.animation.modalDuration,
-      ease: GALLERY_CONFIG.animation.modalEase
-    });
+    if (!pathElement) {
+      console.warn('Path element not provided for state animation');
+      return;
+    }
+
+    if (!targetState || typeof targetState.opacity === 'undefined') {
+      console.warn('Invalid target state provided for path animation');
+      return;
+    }
+
+    try {
+      gsap.to(pathElement, {
+        opacity: targetState.opacity,
+        duration: GALLERY_CONFIG.animation.modalDuration,
+        ease: GALLERY_CONFIG.animation.modalEase
+      });
+    } catch (error) {
+      console.error('Error animating path state:', error);
+    }
   }
 
   /**
@@ -232,14 +365,19 @@ export class AnimationManager {
    * @param {boolean} isHover - Whether hovering
    */
   animatePathHover(pathElement, isHover) {
-    const targetWidth = isHover ?
-      GALLERY_CONFIG.path.strokeWidth.hover :
-      GALLERY_CONFIG.path.strokeWidth.normal;
+    if (!pathElement) {
+      console.warn('Path element not provided for hover animation');
+      return;
+    }
 
-    gsap.to(pathElement, {
-      strokeWidth: targetWidth,
-      duration: GALLERY_CONFIG.animation.modalDuration,
-      ease: GALLERY_CONFIG.animation.modalEase
-    });
+    try {
+      const targetWidth = isHover ?
+        GALLERY_CONFIG.path.strokeWidth.hover :
+        GALLERY_CONFIG.path.strokeWidth.normal;
+
+      AnimationHelpers.animateStrokeWidth(pathElement, targetWidth);
+    } catch (error) {
+      console.error('Error animating path hover:', error);
+    }
   }
 }

@@ -2,7 +2,7 @@ import { GALLERY_CONFIG } from '../core/config.js';
 
 export class MathUtils {
   /**
-   * Calculate position on circle for given index
+   * Calculate center position on circle for given index (for connections)
    * @param {number} index - Item index
    * @param {number} totalItems - Total number of items (defaults to 8)
    * @returns {Object} Position object {x, y}
@@ -12,6 +12,21 @@ export class MathUtils {
     return {
       x: GALLERY_CONFIG.centerX + GALLERY_CONFIG.radius * Math.cos(angle),
       y: GALLERY_CONFIG.centerY + GALLERY_CONFIG.radius * Math.sin(angle)
+    };
+  }
+
+  /**
+   * Calculate element position on circle for DOM positioning (top-left corner)
+   * @param {number} index - Item index
+   * @param {number} totalItems - Total number of items (defaults to 8)
+   * @returns {Object} Position object {x, y}
+   */
+  static getItemElementPosition(index, totalItems = 8) {
+    const centerPos = this.getItemPosition(index, totalItems);
+    const offset = GALLERY_CONFIG.itemSize / 2;
+    return {
+      x: centerPos.x - offset,
+      y: centerPos.y - offset
     };
   }
 

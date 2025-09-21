@@ -7,9 +7,19 @@ import { DOMUtils } from '../utils/dom-utils.js';
 
 export class GSAPGalleryViewer {
   constructor() {
-    this.initializeProperties();
-    this.initializeManagers();
-    this.init();
+    this.isInitialized = false;
+    this.hasErrors = false;
+
+    try {
+      this.initializeProperties();
+      this.initializeManagers();
+      this.init();
+      this.isInitialized = true;
+    } catch (error) {
+      this.hasErrors = true;
+      console.error('Gallery initialization failed:', error);
+      this.showFallbackMessage();
+    }
   }
 
   /**
@@ -24,26 +34,46 @@ export class GSAPGalleryViewer {
     }
 
     this.itemCount = this.elements.galleryItems.length;
+
+    if (this.itemCount === 0) {
+      throw new Error('No gallery items found');
+    }
   }
 
   /**
    * Initialize manager instances
    */
   initializeManagers() {
-    this.graphManager = new GraphManager(this.itemCount);
-    this.animationManager = new AnimationManager();
-    this.eventManager = new EventManager();
-    this.pathManager = new PathManager(this.elements.connectionSvg);
+    try {
+      this.graphManager = new GraphManager(this.itemCount);
+      this.animationManager = new AnimationManager();
+      this.eventManager = new EventManager();
+      this.pathManager = new PathManager(this.elements.connectionSvg);
+    } catch (error) {
+      console.error('Failed to initialize managers:', error);
+      throw error;
+    }
   }
 
   /**
    * Initialize the gallery
    */
   init() {
-    this.setup3DPerspective();
-    this.setupCircularLayout();
-    this.setupEventListeners();
-    this.animateGalleryItems();
+    if (this.hasErrors) {
+      console.warn('Skipping gallery initialization due to previous errors');
+      return;
+    }
+
+    try {
+      this.setup3DPerspective();
+      this.setupCircularLayout();
+      this.setupEventListeners();
+      this.animateGalleryItems();
+    } catch (error) {
+      console.error('Error during gallery initialization:', error);
+      this.showFallbackMessage();
+      throw error;
+    }
   }
 
   /**
@@ -69,16 +99,17 @@ export class GSAPGalleryViewer {
       onModalClose: () => this.closeModal(),
       onEscapeKey: () => this.closeModal()
     });
+  }
 
-    // Setup hover events for items
-    this.elements.galleryItems.forEach((item, index) => {
-      this.animationManager.addHoverAnimation(
-        item,
-        index,
-        (itemIndex) => this.onItemHover(itemIndex, true),
-        (itemIndex) => this.onItemHover(itemIndex, false)
-      );
-    });
+  /**
+   * Setup hover events after animation completion
+   */
+  setupHoverEvents() {
+    this.eventManager.setupUnifiedItemHoverEvents(
+      this.elements.galleryItems,
+      (itemIndex, isHover) => this.onItemHover(itemIndex, isHover),
+      (item, isHover) => this.animationManager.executeHoverAnimation(item, isHover)
+    );
   }
 
   /**
@@ -99,6 +130,7 @@ export class GSAPGalleryViewer {
     this.pathManager.createConnectionLines(connections);
     this.animateConnectionLines();
     this.setupPathEvents();
+    this.setupHoverEvents(); // Setup hover events after animations complete
   }
 
   /**
@@ -107,7 +139,7 @@ export class GSAPGalleryViewer {
   animateConnectionLines() {
     const connectionLines = this.pathManager.getConnectionLines();
     connectionLines.forEach((lineData, index) => {
-      this.animationManager.animatePathStroke(lineData.element, index * 0.2);
+      this.animationManager.animatePathStroke(lineData.element, index * GALLERY_CONFIG.animation.pathStrokeDelay);
     });
   }
 
@@ -192,11 +224,48 @@ export class GSAPGalleryViewer {
   }
 
   /**
+   * Show fallback message when gallery fails to initialize
+   */
+  showFallbackMessage() {
+    try {
+      const container = document.querySelector('.gallery-container');
+      if (container) {
+        container.innerHTML = `
+          <div class="fallback-message" style="
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            font-family: Arial, sans-serif;
+          ">
+            <h3>Gallery Not Available</h3>
+            <p>The gallery could not be loaded properly. Please check the console for error details.</p>
+            <p>Ensure all required files are loaded and the DOM structure is correct.</p>
+          </div>
+        `;
+      }
+    } catch (error) {
+      console.error('Failed to show fallback message:', error);
+    }
+  }
+
+  /**
+   * Check if gallery is properly initialized
+   * @returns {boolean} Whether gallery is ready
+   */
+  isReady() {
+    return this.isInitialized && !this.hasErrors;
+  }
+
+  /**
    * Cleanup resources
    */
   destroy() {
-    this.eventManager.cleanup();
-    this.pathManager.clearConnections();
+    if (this.eventManager) {
+      this.eventManager.cleanup();
+    }
+    if (this.pathManager) {
+      this.pathManager.clearConnections();
+    }
     console.log('Gallery viewer destroyed');
   }
 }

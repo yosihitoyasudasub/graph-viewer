@@ -1,4 +1,5 @@
 import { DOM_SELECTORS } from '../core/config.js';
+import { DOMUtils } from '../utils/dom-utils.js';
 
 export class EventManager {
   constructor() {
@@ -20,7 +21,12 @@ export class EventManager {
    * @param {Function} onItemClick - Click handler function
    */
   setupGalleryItemEvents(onItemClick) {
-    const galleryItems = document.querySelectorAll(DOM_SELECTORS.galleryItems);
+    const galleryItems = DOMUtils.querySelectorAll(DOM_SELECTORS.galleryItems);
+
+    if (galleryItems.length === 0) {
+      console.warn('No gallery items found for click events');
+      return;
+    }
 
     galleryItems.forEach((item, index) => {
       const clickHandler = (e) => onItemClick(e.currentTarget, index);
@@ -40,8 +46,8 @@ export class EventManager {
    * @param {Function} onModalClose - Close handler function
    */
   setupModalEvents(onModalClose) {
-    const closeButton = document.querySelector(DOM_SELECTORS.closeButton);
-    const modalBackground = document.querySelector(DOM_SELECTORS.modalBackground);
+    const closeButton = DOMUtils.querySelector(DOM_SELECTORS.closeButton);
+    const modalBackground = DOMUtils.querySelector(DOM_SELECTORS.modalBackground);
 
     if (closeButton) {
       const closeHandler = () => onModalClose();
@@ -52,6 +58,8 @@ export class EventManager {
         event: 'click',
         handler: closeHandler
       });
+    } else {
+      console.warn('Close button not found - modal close via button will not work');
     }
 
     if (modalBackground) {
@@ -63,6 +71,8 @@ export class EventManager {
         event: 'click',
         handler: backgroundHandler
       });
+    } else {
+      console.warn('Modal background not found - modal close via background will not work');
     }
   }
 
@@ -142,7 +152,42 @@ export class EventManager {
   }
 
   /**
-   * Setup gallery item hover events for connection highlighting
+   * Setup unified gallery item hover events (animation + connection highlighting)
+   * @param {NodeList} galleryItems - Gallery item elements
+   * @param {Function} onItemHover - Item hover handler for connections
+   * @param {Function} onItemAnimation - Item animation handler
+   */
+  setupUnifiedItemHoverEvents(galleryItems, onItemHover, onItemAnimation) {
+    galleryItems.forEach((item, index) => {
+      const mouseEnterHandler = () => {
+        onItemAnimation(item, true);  // Execute hover animation
+        onItemHover(index, true);     // Execute connection highlighting
+      };
+
+      const mouseLeaveHandler = () => {
+        onItemAnimation(item, false); // Execute hover animation
+        onItemHover(index, false);    // Execute connection highlighting
+      };
+
+      item.addEventListener('mouseenter', mouseEnterHandler);
+      item.addEventListener('mouseleave', mouseLeaveHandler);
+
+      this.eventListeners.set(`unified-hover-enter-${index}`, {
+        element: item,
+        event: 'mouseenter',
+        handler: mouseEnterHandler
+      });
+
+      this.eventListeners.set(`unified-hover-leave-${index}`, {
+        element: item,
+        event: 'mouseleave',
+        handler: mouseLeaveHandler
+      });
+    });
+  }
+
+  /**
+   * Setup gallery item hover events for connection highlighting only
    * @param {NodeList} galleryItems - Gallery item elements
    * @param {Function} onItemHover - Item hover handler
    */

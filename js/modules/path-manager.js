@@ -1,10 +1,16 @@
 import { GALLERY_CONFIG, PATH_STATES } from '../core/config.js';
 import { MathUtils } from '../utils/math-utils.js';
+import { AnimationHelpers } from '../utils/animation-helpers.js';
 
 export class PathManager {
   constructor(connectionSvg) {
     this.connectionSvg = connectionSvg;
     this.connectionLines = [];
+    this.isEnabled = !!connectionSvg;
+
+    if (!this.isEnabled) {
+      console.warn('PathManager initialized without SVG element - connection lines will be disabled');
+    }
   }
 
   /**
@@ -12,9 +18,23 @@ export class PathManager {
    * @param {Array} connections - Array of {from, to} connection objects
    */
   createConnectionLines(connections) {
-    connections.forEach(connection => {
-      this.createSingleLine(connection.from, connection.to);
-    });
+    if (!this.isEnabled) {
+      console.info('Path creation skipped - SVG element not available');
+      return;
+    }
+
+    if (!connections || connections.length === 0) {
+      console.warn('No connections provided for path creation');
+      return;
+    }
+
+    try {
+      connections.forEach(connection => {
+        this.createSingleLine(connection.from, connection.to);
+      });
+    } catch (error) {
+      console.error('Error creating connection lines:', error);
+    }
   }
 
   /**
@@ -23,28 +43,52 @@ export class PathManager {
    * @param {number} index2 - Second item index
    */
   createSingleLine(index1, index2) {
-    const pos1 = MathUtils.getItemPosition(index1);
-    const pos2 = MathUtils.getItemPosition(index2);
-
-    let pathData;
-    if (MathUtils.isDiagonalPair(index1, index2)) {
-      pathData = this.createLinearPath(pos1, pos2);
-    } else {
-      pathData = this.createArcPath(pos1, pos2);
+    if (!this.isEnabled) {
+      return null;
     }
 
-    const pathElement = this.createPathElement(pathData, index1, index2);
-    this.connectionSvg.appendChild(pathElement);
+    if (!this.connectionSvg) {
+      console.error('Connection SVG not available for line creation');
+      return null;
+    }
 
-    const lineData = {
-      element: pathElement,
-      from: index1,
-      to: index2,
-      state: PATH_STATES.PINK_SOLID
-    };
+    if (typeof index1 !== 'number' || typeof index2 !== 'number') {
+      console.error('Invalid indices provided for line creation:', index1, index2);
+      return null;
+    }
 
-    this.connectionLines.push(lineData);
-    return lineData;
+    try {
+      const pos1 = MathUtils.getItemPosition(index1);
+      const pos2 = MathUtils.getItemPosition(index2);
+
+      let pathData;
+      if (MathUtils.isDiagonalPair(index1, index2)) {
+        pathData = this.createLinearPath(pos1, pos2);
+      } else {
+        pathData = this.createArcPath(pos1, pos2);
+      }
+
+      const pathElement = this.createPathElement(pathData, index1, index2);
+      if (!pathElement) {
+        console.error('Failed to create path element');
+        return null;
+      }
+
+      this.connectionSvg.appendChild(pathElement);
+
+      const lineData = {
+        element: pathElement,
+        from: index1,
+        to: index2,
+        state: PATH_STATES.PINK_SOLID
+      };
+
+      this.connectionLines.push(lineData);
+      return lineData;
+    } catch (error) {
+      console.error('Error creating connection line:', error);
+      return null;
+    }
   }
 
   /**
@@ -124,31 +168,25 @@ export class PathManager {
     switch(lineData.state) {
       case PATH_STATES.PINK_SOLID:
         element.removeAttribute('stroke-dasharray');
-        element.style.stroke = GALLERY_CONFIG.path.colors.pink;
-        gsap.to(element, {
+        AnimationHelpers.animatePathState(element, {
           opacity: GALLERY_CONFIG.path.opacity.normal,
-          duration: GALLERY_CONFIG.animation.modalDuration,
-          ease: GALLERY_CONFIG.animation.modalEase
+          stroke: GALLERY_CONFIG.path.colors.pink
         });
         break;
 
       case PATH_STATES.GREEN_SOLID:
         element.removeAttribute('stroke-dasharray');
-        element.style.stroke = GALLERY_CONFIG.path.colors.green;
-        gsap.to(element, {
+        AnimationHelpers.animatePathState(element, {
           opacity: GALLERY_CONFIG.path.opacity.normal,
-          duration: GALLERY_CONFIG.animation.modalDuration,
-          ease: GALLERY_CONFIG.animation.modalEase
+          stroke: GALLERY_CONFIG.path.colors.green
         });
         break;
 
       case PATH_STATES.TRANSPARENT:
         element.removeAttribute('stroke-dasharray');
-        element.style.stroke = GALLERY_CONFIG.path.colors.pink;
-        gsap.to(element, {
+        AnimationHelpers.animatePathState(element, {
           opacity: GALLERY_CONFIG.path.opacity.light,
-          duration: GALLERY_CONFIG.animation.modalDuration,
-          ease: GALLERY_CONFIG.animation.modalEase
+          stroke: GALLERY_CONFIG.path.colors.pink
         });
         break;
     }
@@ -160,31 +198,35 @@ export class PathManager {
    * @param {boolean} isHighlight - Whether to highlight or restore
    */
   highlightConnections(itemIndex, isHighlight) {
-    this.connectionLines.forEach(lineData => {
-      if (lineData.from === itemIndex || lineData.to === itemIndex) {
+    if (!this.isEnabled) {
+      return;
+    }
+
+    try {
+      const relevantPaths = this.connectionLines.filter(lineData =>
+        lineData.from === itemIndex || lineData.to === itemIndex
+      );
+
+      if (relevantPaths.length === 0) {
+        return;
+      }
+
+      const getOpacityFn = (pathData) => {
         if (isHighlight) {
-          const targetOpacity = lineData.state === PATH_STATES.TRANSPARENT ?
+          return pathData.state === PATH_STATES.TRANSPARENT ?
             GALLERY_CONFIG.path.opacity.lightHighlight :
             GALLERY_CONFIG.path.opacity.highlight;
-
-          gsap.to(lineData.element, {
-            strokeWidth: GALLERY_CONFIG.path.strokeWidth.hover,
-            opacity: targetOpacity,
-            duration: GALLERY_CONFIG.animation.modalDuration
-          });
         } else {
-          const targetOpacity = lineData.state === PATH_STATES.TRANSPARENT ?
+          return pathData.state === PATH_STATES.TRANSPARENT ?
             GALLERY_CONFIG.path.opacity.light :
             GALLERY_CONFIG.path.opacity.normal;
-
-          gsap.to(lineData.element, {
-            strokeWidth: GALLERY_CONFIG.path.strokeWidth.normal,
-            opacity: targetOpacity,
-            duration: GALLERY_CONFIG.animation.modalDuration
-          });
         }
-      }
-    });
+      };
+
+      AnimationHelpers.animateConnectionHighlight(relevantPaths, isHighlight, getOpacityFn);
+    } catch (error) {
+      console.error('Error highlighting connections:', error);
+    }
   }
 
   /**

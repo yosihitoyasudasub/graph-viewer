@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error Handling Test - Gallery Viewer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 3px;
+        }
+        .pass { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .fail { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .warning { background-color: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+    </style>
+</head>
+<body>
+    <h1>Error Handling Test Suite</h1>
+    <p>This page tests various error handling scenarios for the gallery viewer.</p>
+
+    <div class="test-section">
+        <h2>Test 1: Missing GSAP Library</h2>
+        <div id="test1-result">Testing...</div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 2: Missing DOM Elements</h2>
+        <div id="test2-result">Testing...</div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 3: Invalid Configuration</h2>
+        <div id="test3-result">Testing...</div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 4: Module Import Failures</h2>
+        <div id="test4-result">Testing...</div>
+    </div>
+
+    <script type="module">
+        // Test utilities
+        function showResult(testId, message, type = 'pass') {
+            const element = document.getElementById(testId);
+            element.textContent = message;
+            element.className = `test-result ${type}`;
+        }
+
+        // Test 1: Missing GSAP Library
+        function test1() {
+            try {
+                if (typeof gsap === 'undefined') {
+                    showResult('test1-result', 'PASS: GSAP not loaded, should trigger fallback', 'pass');
+                } else {
+                    showResult('test1-result', 'SKIP: GSAP is loaded', 'warning');
+                }
+            } catch (error) {
+                showResult('test1-result', `FAIL: ${error.message}`, 'fail');
+            }
+        }
+
+        // Test 2: Missing DOM Elements
+        function test2() {
+            try {
+                // Try to import DOMUtils
+                import('./js/utils/dom-utils.js').then(({ DOMUtils }) => {
+                    try {
+                        DOMUtils.getRequiredElements();
+                        showResult('test2-result', 'FAIL: Should have thrown error for missing elements', 'fail');
+                    } catch (error) {
+                        showResult('test2-result', `PASS: Correctly detected missing elements: ${error.message}`, 'pass');
+                    }
+                }).catch(importError => {
+                    showResult('test2-result', `FAIL: Cannot import DOMUtils: ${importError.message}`, 'fail');
+                });
+            } catch (error) {
+                showResult('test2-result', `FAIL: ${error.message}`, 'fail');
+            }
+        }
+
+        // Test 3: Invalid Configuration
+        function test3() {
+            try {
+                import('./js/core/config.js').then(({ GALLERY_CONFIG }) => {
+                    if (GALLERY_CONFIG && typeof GALLERY_CONFIG.radius === 'number') {
+                        showResult('test3-result', 'PASS: Configuration loaded successfully', 'pass');
+                    } else {
+                        showResult('test3-result', 'FAIL: Invalid configuration structure', 'fail');
+                    }
+                }).catch(error => {
+                    showResult('test3-result', `FAIL: Cannot load configuration: ${error.message}`, 'fail');
+                });
+            } catch (error) {
+                showResult('test3-result', `FAIL: ${error.message}`, 'fail');
+            }
+        }
+
+        // Test 4: Module Import Failures
+        function test4() {
+            try {
+                // Test if all modules can be imported
+                const moduleTests = [
+                    './js/core/gallery-viewer.js',
+                    './js/modules/animation-manager.js',
+                    './js/modules/event-manager.js',
+                    './js/modules/path-manager.js',
+                    './js/utils/math-utils.js'
+                ];
+
+                Promise.all(moduleTests.map(module => import(module)))
+                    .then(() => {
+                        showResult('test4-result', 'PASS: All modules imported successfully', 'pass');
+                    })
+                    .catch(error => {
+                        showResult('test4-result', `FAIL: Module import failed: ${error.message}`, 'fail');
+                    });
+            } catch (error) {
+                showResult('test4-result', `FAIL: ${error.message}`, 'fail');
+            }
+        }
+
+        // Run tests
+        test1();
+        test2();
+        test3();
+        test4();
+
+        // Console test output
+        console.log('Error Handling Test Suite Started');
+        console.log('Check the page for visual test results');
+    </script>
+</body>
+</html>
