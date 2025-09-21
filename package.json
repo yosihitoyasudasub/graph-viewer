@@ -1,0 +1,21 @@
+{
+  "name": "gsap-gallery-viewer",
+  "version": "1.0.0",
+  "description": "Interactive gallery viewer with GSAP animations",
+  "main": "index.html",
+  "scripts": {
+    "dev": "python -m http.server 8000",
+    "serve": "python -m http.server 8000"
+  },
+  "keywords": [
+    "gallery",
+    "gsap",
+    "animation",
+    "javascript",
+    "es6-modules"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {}
+}
