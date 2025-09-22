@@ -1,4 +1,4 @@
-import { DOM_SELECTORS } from '../core/config.js';
+import { DOM_SELECTORS, GALLERY_CONFIG } from '../core/config.js';
 
 export class DOMUtils {
   /**
@@ -32,12 +32,50 @@ export class DOMUtils {
   }
 
   /**
+   * Generate gallery items dynamically based on config
+   */
+  static generateGalleryItems() {
+    const galleryCircle = this.querySelector(DOM_SELECTORS.galleryCircle);
+    if (!galleryCircle) {
+      throw new Error('Gallery circle container not found');
+    }
+
+    // Clear existing items
+    galleryCircle.innerHTML = '';
+
+    // Generate items based on config
+    for (let i = 1; i <= GALLERY_CONFIG.itemCount; i++) {
+      const imageUrl = GALLERY_CONFIG.imageUrlPattern.replace('{index}', i);
+
+      const galleryItem = this.createElement('div', {
+        className: 'gallery-item',
+        attributes: {
+          'data-image': imageUrl
+        }
+      });
+
+      const img = this.createElement('img', {
+        attributes: {
+          src: imageUrl,
+          alt: `Gallery Image ${i}`
+        }
+      });
+
+      galleryItem.appendChild(img);
+      galleryCircle.appendChild(galleryItem);
+    }
+  }
+
+  /**
    * Get required DOM elements for gallery functionality
    * @returns {Object} Object containing all required DOM elements
    * @throws {Error} If required elements are not found
    */
   static getRequiredElements() {
     const elements = {};
+
+    // Generate gallery items first
+    this.generateGalleryItems();
 
     // Get gallery items
     elements.galleryItems = this.querySelectorAll(DOM_SELECTORS.galleryItems);

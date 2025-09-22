@@ -4,10 +4,10 @@ export class MathUtils {
   /**
    * Calculate center position on circle for given index (for connections)
    * @param {number} index - Item index
-   * @param {number} totalItems - Total number of items (defaults to 8)
+   * @param {number} totalItems - Total number of items (defaults to config value)
    * @returns {Object} Position object {x, y}
    */
-  static getItemPosition(index, totalItems = 8) {
+  static getItemPosition(index, totalItems = GALLERY_CONFIG.itemCount) {
     const angle = (index / totalItems) * Math.PI * 2;
     return {
       x: GALLERY_CONFIG.centerX + GALLERY_CONFIG.radius * Math.cos(angle),
@@ -18,10 +18,10 @@ export class MathUtils {
   /**
    * Calculate element position on circle for DOM positioning (top-left corner)
    * @param {number} index - Item index
-   * @param {number} totalItems - Total number of items (defaults to 8)
+   * @param {number} totalItems - Total number of items (defaults to config value)
    * @returns {Object} Position object {x, y}
    */
-  static getItemElementPosition(index, totalItems = 8) {
+  static getItemElementPosition(index, totalItems = GALLERY_CONFIG.itemCount) {
     const centerPos = this.getItemPosition(index, totalItems);
     const offset = GALLERY_CONFIG.itemSize / 2;
     return {
@@ -34,10 +34,10 @@ export class MathUtils {
    * Check if two indices represent diagonal pairs in a circle
    * @param {number} index1 - First index
    * @param {number} index2 - Second index
-   * @param {number} totalItems - Total number of items (defaults to 8)
+   * @param {number} totalItems - Total number of items (defaults to config value)
    * @returns {boolean} True if diagonal pair
    */
-  static isDiagonalPair(index1, index2, totalItems = 8) {
+  static isDiagonalPair(index1, index2, totalItems = GALLERY_CONFIG.itemCount) {
     const diff = Math.abs(index1 - index2);
     return totalItems % 2 === 0 && diff === totalItems / 2;
   }

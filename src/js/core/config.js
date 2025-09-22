@@ -4,6 +4,8 @@ export const GALLERY_CONFIG = {
   centerX: 300,
   centerY: 300,
   itemSize: 100,
+  itemCount: 12, // ここで画像の数を設定
+  imageUrlPattern: "https://picsum.photos/600/600?random={index}", // {index}が1,2,3...に置換される
 
   // Animation settings
   animation: {
@@ -77,5 +79,6 @@ export const DOM_SELECTORS = {
   modalBackground: '.modal-background',
   connectionSvg: '#connection-svg',
   modalContent: '.modal-content',
-  galleryContainer: '.gallery-container'
+  galleryContainer: '.gallery-container',
+  galleryCircle: '.gallery-circle'
 };
