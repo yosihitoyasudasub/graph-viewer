@@ -44,20 +44,30 @@ export class DOMUtils {
     galleryCircle.innerHTML = '';
 
     // Generate items based on config
-    for (let i = 1; i <= GALLERY_CONFIG.itemCount; i++) {
-      const imageUrl = GALLERY_CONFIG.imageUrlPattern.replace('{index}', i);
+    for (let i = 0; i < GALLERY_CONFIG.itemCount; i++) {
+      const itemData = GALLERY_CONFIG.itemData[i];
+      if (!itemData) {
+        console.warn(`No data found for item ${i}, using fallback`);
+        continue;
+      }
 
       const galleryItem = this.createElement('div', {
         className: 'gallery-item',
         attributes: {
-          'data-image': imageUrl
+          'data-image': itemData.image,
+          'data-index': i,
+          'data-text1': itemData.text1,
+          'data-text2': itemData.text2,
+          'data-text3': itemData.text3,
+          'data-text4': itemData.text4,
+          'data-text5': itemData.text5
         }
       });
 
       const img = this.createElement('img', {
         attributes: {
-          src: imageUrl,
-          alt: `Gallery Image ${i}`
+          src: itemData.image,
+          alt: itemData.text1 || `Gallery Image ${i + 1}`
         }
       });
 

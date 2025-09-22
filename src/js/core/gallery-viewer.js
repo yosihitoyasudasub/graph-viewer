@@ -187,18 +187,49 @@ export class GSAPGalleryViewer {
   }
 
   /**
-   * Open modal with selected item
+   * Open modal with selected item and metadata
    * @param {HTMLElement} item - Clicked gallery item
    */
   openModal(item) {
-    const imageUrl = item.getAttribute('data-image');
-    this.animationManager.openModal(
-      this.elements.modal,
-      this.elements.modalBackground,
-      this.elements.modalImage,
-      item,
-      imageUrl
-    );
+    try {
+      const imageUrl = item.getAttribute('data-image');
+      const text1 = item.getAttribute('data-text1');
+      const text2 = item.getAttribute('data-text2');
+      const text3 = item.getAttribute('data-text3');
+      const text4 = item.getAttribute('data-text4');
+      const text5 = item.getAttribute('data-text5');
+
+      if (!imageUrl) {
+        console.error('No image URL found for gallery item');
+        return;
+      }
+
+      // Update modal content with metadata
+      const modalImage = this.elements.modalImage;
+      const modalText1 = document.getElementById('modal-text1');
+      const modalText2 = document.getElementById('modal-text2');
+      const modalText3 = document.getElementById('modal-text3');
+      const modalText4 = document.getElementById('modal-text4');
+      const modalText5 = document.getElementById('modal-text5');
+
+      if (modalImage) modalImage.src = imageUrl;
+      if (modalText1) modalText1.textContent = text1 || 'タイトルなし';
+      if (modalText2) modalText2.textContent = text2 || '説明がありません';
+      if (modalText3) modalText3.textContent = text3 || 'カテゴリなし';
+      if (modalText4) modalText4.textContent = text4 || '日付不明';
+      if (modalText5) modalText5.textContent = text5 || '作者不明';
+
+      // Open modal using animation manager
+      this.animationManager.openModal(
+        this.elements.modal,
+        this.elements.modalBackground,
+        this.elements.modalImage,
+        item,
+        imageUrl
+      );
+    } catch (error) {
+      console.error('Error opening modal:', error);
+    }
   }
 
   /**
