@@ -80,7 +80,7 @@ export class PathManager {
         element: pathElement,
         from: index1,
         to: index2,
-        state: PATH_STATES.PINK_SOLID
+        state: PATH_STATES.TRANSPARENT
       };
 
       this.connectionLines.push(lineData);
@@ -105,7 +105,7 @@ export class PathManager {
     pathElement.setAttribute('fill', 'none');
     pathElement.setAttribute('stroke', GALLERY_CONFIG.path.colors.pink);
     pathElement.setAttribute('stroke-width', GALLERY_CONFIG.path.strokeWidth.normal);
-    pathElement.setAttribute('opacity', GALLERY_CONFIG.path.opacity.normal);
+    pathElement.setAttribute('opacity', GALLERY_CONFIG.path.opacity.light); // 初期は薄い透明度
     pathElement.setAttribute('data-from', index1);
     pathElement.setAttribute('data-to', index2);
 
@@ -147,14 +147,28 @@ export class PathManager {
   }
 
   /**
-   * Toggle path state (cycle through states)
+   * Toggle path state (cycle through states: 2→0→1→2)
    * @param {SVGPathElement} pathElement - Path element to toggle
    */
   togglePathState(pathElement) {
     const lineData = this.connectionLines.find(line => line.element === pathElement);
     if (!lineData) return;
 
-    lineData.state = (lineData.state + 1) % 3;
+    // Custom cycle: TRANSPARENT(2) → PINK_SOLID(0) → GREEN_SOLID(1) → TRANSPARENT(2)
+    switch(lineData.state) {
+      case PATH_STATES.TRANSPARENT: // 2
+        lineData.state = PATH_STATES.PINK_SOLID; // 0
+        break;
+      case PATH_STATES.PINK_SOLID: // 0
+        lineData.state = PATH_STATES.GREEN_SOLID; // 1
+        break;
+      case PATH_STATES.GREEN_SOLID: // 1
+        lineData.state = PATH_STATES.TRANSPARENT; // 2
+        break;
+      default:
+        lineData.state = PATH_STATES.TRANSPARENT; // fallback
+    }
+
     this.applyPathVisualState(lineData);
   }
 

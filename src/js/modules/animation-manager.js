@@ -318,7 +318,8 @@ export class AnimationManager {
 
       gsap.set(pathElement, {
         strokeDasharray: `${length} ${length}`,
-        strokeDashoffset: length
+        strokeDashoffset: length,
+        opacity: GALLERY_CONFIG.path.opacity.light // 薄い透明度を設定
       });
 
       gsap.to(pathElement, {
