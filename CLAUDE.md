@@ -42,7 +42,6 @@ npm test
 ## ディレクトリ構成
 ```
 graph-viewer/
-├── public/          # 静的ファイル
 ├── src/            # ソースコード
 │   ├── js/         # JavaScript
 │   ├── css/        # スタイルシート
@@ -59,4 +58,19 @@ graph-viewer/
 ## デプロイ手順
 1. Vercelアカウントにログイン
 2. GitHubリポジトリを連携
+
+git init  # ローカルフォルダをGitリポジトリに初期化
+git add .
+git commit -m "first commit"
+git remote add origin https://github.com/yosihitoyasudasub/graph-viewer.git
+git branch -M main
+git push -u origin main
+
+もしremote origin already existsエラーが出た場合は：
+
+  git remote remove origin
+  git remote add origin
+  https://github.com/yosihitoyasudasub/graph-viewer.git        
+  git push -u origin main
 3. 自動デプロイが実行される
+vercel --prod
