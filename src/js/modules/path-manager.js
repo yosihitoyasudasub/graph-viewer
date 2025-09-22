@@ -290,4 +290,24 @@ export class PathManager {
   getConnectionCount() {
     return this.connectionLines.length;
   }
+
+  /**
+   * Reset all paths to transparent state (light pink)
+   */
+  resetAllPaths() {
+    if (!this.isEnabled) {
+      console.info('Path reset skipped - SVG element not available');
+      return;
+    }
+
+    try {
+      this.connectionLines.forEach(lineData => {
+        lineData.state = PATH_STATES.TRANSPARENT;
+        this.applyPathVisualState(lineData);
+      });
+      console.log('All paths reset to transparent state');
+    } catch (error) {
+      console.error('Error resetting paths:', error);
+    }
+  }
 }

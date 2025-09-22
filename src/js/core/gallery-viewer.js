@@ -99,6 +99,23 @@ export class GSAPGalleryViewer {
       onModalClose: () => this.closeModal(),
       onEscapeKey: () => this.closeModal()
     });
+
+    // Setup reset button listener
+    this.setupResetButtonListener();
+  }
+
+  /**
+   * Setup reset button event listener
+   */
+  setupResetButtonListener() {
+    const resetButton = document.getElementById('reset-paths-btn');
+    if (resetButton) {
+      resetButton.addEventListener('click', () => {
+        this.pathManager.resetAllPaths();
+      });
+    } else {
+      console.warn('Reset button not found - reset functionality will not be available');
+    }
   }
 
   /**
