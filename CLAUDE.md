@@ -1,5 +1,8 @@
 # Graph Viewer Project
 
+## バイブコーディングルール
+"noncode"　がプロンプト文末に含まれているときは、コードは作成しないでください。かつ実装もしないでください。
+
 ## プロジェクト概要
 HTML、JavaScript、CSSで構築されたグラフビューワーWebアプリケーション
 
@@ -20,9 +23,6 @@ HTML、JavaScript、CSSで構築されたグラフビューワーWebアプリケ
 ## コマンド
 
 ### 開発
-```bash
-npm run dev
-```
 
 ### リント
 ```bash
@@ -35,9 +35,6 @@ npm run typecheck
 ```
 
 ### テスト
-```bash
-npm test
-```
 
 ## ディレクトリ構成
 ```
@@ -47,13 +44,12 @@ graph-viewer/
 │   ├── css/        # スタイルシート
 │   └── assets/     # 画像等のアセット
 ├── package.json    # 依存関係
-└── vercel.json     # Vercelデプロイ設定
+├── vercel.json     # Vercelデプロイ設定
+└── index.html      # index.html
 ```
 
 ## セットアップ
 1. リポジトリをクローン
-2. `npm install`
-3. `npm run dev`
 
 ## デプロイ手順
 1. Vercelアカウントにログイン
@@ -62,7 +58,7 @@ graph-viewer/
 git init  # ローカルフォルダをGitリポジトリに初期化
 git add .
 git commit -m "first commit"
-git remote add origin https://github.com/yosihitoyasudasub/graph-viewer.git
+git remote add origin https://github.com/xxx
 git branch -M main
 git push -u origin main
 
@@ -70,7 +66,8 @@ git push -u origin main
 
   git remote remove origin
   git remote add origin
-  https://github.com/yosihitoyasudasub/graph-viewer.git        
+  https://github.com/xxx
   git push -u origin main
+
 3. 自動デプロイが実行される
 vercel --prod

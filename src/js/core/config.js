@@ -1,5 +1,8 @@
-export const GALLERY_CONFIG = {
-  // Gallery dimensions and layout
+import { ResponsiveConfigManager } from '../utils/responsive-config.js';
+
+// Legacy static configuration - maintained for backward compatibility
+const STATIC_GALLERY_CONFIG = {
+  // Gallery dimensions and layout (these will be overridden by responsive config)
   radius: 250,
   centerX: 300,
   centerY: 300,
@@ -103,65 +106,147 @@ export const GALLERY_CONFIG = {
       text4: "2024年撮影",
       text5: "撮影者: Chris Lee"
     }
-  ], // 各アイテムの詳細情報
-
-  // Animation settings
-  animation: {
-    duration: 0.8,
-    delay: 0.1,
-    ease: "sine.inOut",
-    modalDuration: 0.3,
-    modalEase: "power2.out",
-
-    // Specific animation timings
-    pathStrokeDelay: 0.2,        // Connection line animation stagger
-    pathStrokeDuration: 1.5,     // Path stroke animation duration
-    itemClickScale: 0.8,         // Scale when item is clicked
-    itemClickDuration: 0.2,      // Click animation duration
-    timelineOffset: 0.1,         // Timeline overlap adjustment
-    modalBackgroundDuration: 0.2, // Modal background fade duration
-
-    // Page intro animations
-    introTitleOffset: -50,       // Title slide offset
-    introContainerScale: 0.8,    // Initial container scale
-    introContainerDelay: 0.3     // Container animation delay
-  },
-
-  // Path and connection settings
-  path: {
-    strokeWidth: {
-      normal: 5,
-      hover: 8
-    },
-    colors: {
-      pink: '#ff6b6b',
-      green: '#00ff00'
-    },
-    opacity: {
-      normal: 0.8,
-      light: 0.15,
-      highlight: 1,
-      lightHighlight: 0.3
-    }
-  },
-
-  // Arc calculation constants
-  arcHeightRatio: 0.3,
-  itemDelayMultiplier: 0.1,
-
-  // 3D perspective settings
-  perspective: 1000,
-  transformStyle: "preserve-3d",
-
-  // Hover and interaction
-  hover: {
-    scale: 1.2,
-    brightness: 1.2,
-    saturation: 1.3,
-    duration: 0.3,
-    ease: "power2.out"
-  }
+  ] // 各アイテムの詳細情報
 };
+
+/**
+ * Dynamic gallery configuration that adapts to screen size
+ * This is the main configuration object that should be used throughout the application
+ */
+class GalleryConfig {
+  constructor() {
+    this._cache = null;
+    this._itemCount = STATIC_GALLERY_CONFIG.itemCount;
+    this._responsiveConfigManager = ResponsiveConfigManager;
+  }
+
+  /**
+   * Get current responsive configuration
+   * @returns {Object} Current configuration based on screen size
+   */
+  get current() {
+    // Get responsive config and merge with static data
+    const responsiveConfig = this._responsiveConfigManager.getResponsiveConfig(this._itemCount);
+
+    return {
+      ...responsiveConfig,
+      itemData: STATIC_GALLERY_CONFIG.itemData,
+
+      // Legacy compatibility - these properties are now dynamic
+      radius: responsiveConfig.radius,
+      centerX: responsiveConfig.centerX,
+      centerY: responsiveConfig.centerY,
+      itemSize: responsiveConfig.itemSize,
+      itemCount: responsiveConfig.itemCount,
+      imageUrlPattern: responsiveConfig.imageUrlPattern,
+
+      // Static animation settings (can be overridden by responsive config)
+      animation: responsiveConfig.animation,
+      path: responsiveConfig.path,
+      arcHeightRatio: responsiveConfig.arcHeightRatio,
+      itemDelayMultiplier: responsiveConfig.itemDelayMultiplier,
+      perspective: responsiveConfig.perspective,
+      transformStyle: responsiveConfig.transformStyle,
+      hover: responsiveConfig.hover
+    };
+  }
+
+  /**
+   * Update item count and refresh configuration
+   * @param {number} count - New item count
+   */
+  setItemCount(count) {
+    this._itemCount = count;
+    this._cache = null; // Clear cache to force recalculation
+  }
+
+  /**
+   * Get current item count
+   * @returns {number} Current item count
+   */
+  getItemCount() {
+    return this._itemCount;
+  }
+
+  /**
+   * Force recalculation of configuration
+   */
+  refresh() {
+    this._cache = null;
+    this._responsiveConfigManager.clearCache();
+  }
+
+  /**
+   * Get current breakpoint name
+   * @returns {string} Current breakpoint name
+   */
+  getCurrentBreakpoint() {
+    return this._responsiveConfigManager.getCurrentBreakpointName();
+  }
+
+  /**
+   * Check if we're on a specific breakpoint
+   * @param {string} breakpointName - Breakpoint name to check
+   * @returns {boolean} True if current breakpoint matches
+   */
+  isBreakpoint(breakpointName) {
+    return this._responsiveConfigManager.isBreakpoint(breakpointName);
+  }
+
+  /**
+   * Register callback for breakpoint changes
+   * @param {Function} callback - Function to call when breakpoint changes
+   */
+  onBreakpointChange(callback) {
+    this._responsiveConfigManager.onResize(callback);
+  }
+
+  /**
+   * Remove breakpoint change callback
+   * @param {Function} callback - Function to remove
+   */
+  offBreakpointChange(callback) {
+    this._responsiveConfigManager.offResize(callback);
+  }
+}
+
+// Create singleton instance
+const galleryConfigInstance = new GalleryConfig();
+
+// Export the configuration object that behaves like the original GALLERY_CONFIG
+// but with dynamic properties
+export const GALLERY_CONFIG = new Proxy(galleryConfigInstance, {
+  get(target, prop) {
+    // If accessing the 'current' property or any config property, return from current config
+    if (prop === 'current') {
+      return target.current;
+    }
+
+    // For direct property access, delegate to current configuration
+    const currentConfig = target.current;
+    if (prop in currentConfig) {
+      return currentConfig[prop];
+    }
+
+    // For methods, return them from the target
+    if (typeof target[prop] === 'function') {
+      return target[prop].bind(target);
+    }
+
+    return target[prop];
+  },
+
+  set(target, prop, value) {
+    // Handle special cases
+    if (prop === 'itemCount') {
+      target.setItemCount(value);
+      return true;
+    }
+
+    target[prop] = value;
+    return true;
+  }
+});
 
 export const PATH_STATES = {
   PINK_SOLID: 0,

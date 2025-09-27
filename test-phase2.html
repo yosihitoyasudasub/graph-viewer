@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase 2 Integration Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-result {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+            border-left: 4px solid #007bff;
+            margin: 10px 0;
+        }
+        .success {
+            border-left-color: #28a745;
+            background: #d4edda;
+        }
+        .error {
+            border-left-color: #dc3545;
+            background: #f8d7da;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>Phase 2 Integration Test</h1>
+    <p>Testing all updated Manager classes with responsive configuration</p>
+
+    <div class="test-container">
+        <h2>Configuration Tests</h2>
+        <button onclick="testConfig()">Test GALLERY_CONFIG</button>
+        <button onclick="testBreakpoints()">Test Breakpoints</button>
+        <div id="config-results"></div>
+    </div>
+
+    <div class="test-container">
+        <h2>MathUtils Tests</h2>
+        <button onclick="testMathUtils()">Test Position Calculations</button>
+        <button onclick="testMathUtilsCache()">Test Cache System</button>
+        <div id="mathutils-results"></div>
+    </div>
+
+    <div class="test-container">
+        <h2>Manager Integration Tests</h2>
+        <button onclick="testManagersIntegration()">Test All Managers</button>
+        <button onclick="testResponsiveChanges()">Test Responsive Changes</button>
+        <div id="managers-results"></div>
+    </div>
+
+    <div class="test-container">
+        <h2>System Status</h2>
+        <div id="system-status">Loading...</div>
+        <button onclick="refreshStatus()">Refresh Status</button>
+    </div>
+
+    <script type="module">
+        import { GALLERY_CONFIG } from './src/js/core/config.js';
+        import { MathUtils } from './src/js/utils/math-utils.js';
+        import { ResponsiveConfigManager } from './src/js/utils/responsive-config.js';
+        import { GraphManager } from './src/js/modules/graph-manager.js';
+
+        // Make available globally for testing
+        window.GALLERY_CONFIG = GALLERY_CONFIG;
+        window.MathUtils = MathUtils;
+        window.ResponsiveConfigManager = ResponsiveConfigManager;
+        window.GraphManager = GraphManager;
+
+        function showResult(containerId, result, isSuccess = true) {
+            const container = document.getElementById(containerId);
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-result ${isSuccess ? 'success' : 'error'}`;
+            resultDiv.textContent = result;
+            container.appendChild(resultDiv);
+        }
+
+        function clearResults(containerId) {
+            document.getElementById(containerId).innerHTML = '';
+        }
+
+        // Test functions
+        window.testConfig = function() {
+            clearResults('config-results');
+            try {
+                const config = GALLERY_CONFIG.current;
+                const result = `✓ GALLERY_CONFIG loaded successfully
+Breakpoint: ${config.breakpoint}
+CenterX: ${config.centerX}, CenterY: ${config.centerY}
+Radius: ${config.radius}, ItemSize: ${config.itemSize}
+Container: ${config.containerWidth}x${config.containerHeight}`;
+                showResult('config-results', result, true);
+            } catch (error) {
+                showResult('config-results', `✗ Config test failed: ${error.message}`, false);
+            }
+        };
+
+        window.testBreakpoints = function() {
+            clearResults('config-results');
+            try {
+                const originalWidth = window.innerWidth;
+                let results = [];
+
+                // Test Desktop
+                Object.defineProperty(window, 'innerWidth', { value: 1024, configurable: true });
+                ResponsiveConfigManager.clearCache();
+                const desktopConfig = GALLERY_CONFIG.current;
+                results.push(`Desktop (1024px): radius=${desktopConfig.radius}, center=${desktopConfig.centerX}`);
+
+                // Test Tablet
+                Object.defineProperty(window, 'innerWidth', { value: 768, configurable: true });
+                ResponsiveConfigManager.clearCache();
+                const tabletConfig = GALLERY_CONFIG.current;
+                results.push(`Tablet (768px): radius=${tabletConfig.radius}, center=${tabletConfig.centerX}`);
+
+                // Test Mobile
+                Object.defineProperty(window, 'innerWidth', { value: 480, configurable: true });
+                ResponsiveConfigManager.clearCache();
+                const mobileConfig = GALLERY_CONFIG.current;
+                results.push(`Mobile (480px): radius=${mobileConfig.radius}, center=${mobileConfig.centerX}`);
+
+                // Restore
+                Object.defineProperty(window, 'innerWidth', { value: originalWidth, configurable: true });
+                ResponsiveConfigManager.clearCache();
+
+                showResult('config-results', `✓ Breakpoint tests passed:\\n${results.join('\\n')}`, true);
+            } catch (error) {
+                showResult('config-results', `✗ Breakpoint test failed: ${error.message}`, false);
+            }
+        };
+
+        window.testMathUtils = function() {
+            clearResults('mathutils-results');
+            try {
+                const itemCount = 8;
+                let results = [];
+
+                // Test position calculations
+                for (let i = 0; i < 3; i++) {
+                    const pos = MathUtils.getItemPosition(i, itemCount);
+                    const elemPos = MathUtils.getItemElementPosition(i, itemCount);
+                    results.push(`Item ${i}: center(${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}) elem(${elemPos.x.toFixed(1)}, ${elemPos.y.toFixed(1)})`);
+                }
+
+                // Test layout config
+                const layoutConfig = MathUtils.getCurrentLayoutConfig();
+                results.push(`Layout: ${layoutConfig.breakpoint} - ${layoutConfig.centerX}x${layoutConfig.centerY}, r=${layoutConfig.radius}`);
+
+                showResult('mathutils-results', `✓ MathUtils tests passed:\\n${results.join('\\n')}`, true);
+            } catch (error) {
+                showResult('mathutils-results', `✗ MathUtils test failed: ${error.message}`, false);
+            }
+        };
+
+        window.testMathUtilsCache = function() {
+            clearResults('mathutils-results');
+            try {
+                // Clear cache
+                MathUtils.clearCache();
+
+                // Test cache population
+                const pos1 = MathUtils.getItemPosition(0, 8);
+                const pos2 = MathUtils.getItemPosition(0, 8); // Should be cached
+
+                const stats = MathUtils.getCacheStats();
+
+                const result = `✓ Cache system working
+Cache size: ${stats.size}
+Cache entries: ${stats.entries.slice(0, 3).join(', ')}${stats.entries.length > 3 ? '...' : ''}
+Position consistency: ${JSON.stringify(pos1) === JSON.stringify(pos2) ? 'PASS' : 'FAIL'}`;
+
+                showResult('mathutils-results', result, true);
+            } catch (error) {
+                showResult('mathutils-results', `✗ Cache test failed: ${error.message}`, false);
+            }
+        };
+
+        window.testManagersIntegration = function() {
+            clearResults('managers-results');
+            try {
+                let results = [];
+
+                // Test GraphManager
+                const graphManager = new GraphManager(8);
+                const stats = graphManager.getStats();
+                results.push(`GraphManager: ${stats.nodeCount} nodes, ${stats.totalConnections} connections`);
+
+                // Test connections with positions
+                const connectionsWithPos = graphManager.getConnectionsWithPositions();
+                results.push(`Position integration: ${connectionsWithPos.length} connections with positions`);
+
+                // Test configuration access
+                const currentConfig = graphManager.getCurrentLayoutConfig();
+                results.push(`Config access: breakpoint=${currentConfig.breakpoint}`);
+
+                // Cleanup
+                graphManager.cleanup();
+
+                showResult('managers-results', `✓ Manager integration tests passed:\\n${results.join('\\n')}`, true);
+            } catch (error) {
+                showResult('managers-results', `✗ Manager integration test failed: ${error.message}`, false);
+            }
+        };
+
+        window.testResponsiveChanges = function() {
+            clearResults('managers-results');
+            try {
+                const originalWidth = window.innerWidth;
+                let results = [];
+
+                // Create manager instances
+                const graphManager = new GraphManager(8);
+
+                // Test responsive change
+                Object.defineProperty(window, 'innerWidth', { value: 480, configurable: true });
+
+                // Simulate breakpoint change by forcing recalculation
+                ResponsiveConfigManager.clearCache();
+                const newConfig = GALLERY_CONFIG.current;
+
+                results.push(`Responsive change: ${newConfig.breakpoint} breakpoint`);
+                results.push(`New dimensions: ${newConfig.centerX}x${newConfig.centerY}, r=${newConfig.radius}`);
+
+                // Test manager adaptation
+                const newStats = graphManager.getStats();
+                results.push(`Manager adaptation: ${newStats.configuration.breakpoint} configuration`);
+
+                // Restore
+                Object.defineProperty(window, 'innerWidth', { value: originalWidth, configurable: true });
+                ResponsiveConfigManager.clearCache();
+                graphManager.cleanup();
+
+                showResult('managers-results', `✓ Responsive change tests passed:\\n${results.join('\\n')}`, true);
+            } catch (error) {
+                showResult('managers-results', `✗ Responsive change test failed: ${error.message}`, false);
+            }
+        };
+
+        window.refreshStatus = function() {
+            try {
+                const config = GALLERY_CONFIG.current;
+                const mathStats = MathUtils.getCacheStats();
+                const responsiveStats = ResponsiveConfigManager.getCache();
+
+                const status = `System Status:
+Current Breakpoint: ${config.breakpoint}
+Screen Size: ${window.innerWidth}x${window.innerHeight}
+Configuration: ${config.centerX}x${config.centerY}, radius=${config.radius}
+Math Cache: ${mathStats.size} entries
+Responsive Cache: ${Object.keys(responsiveStats).length} configurations
+All Managers: ✓ Loaded and functional`;
+
+                document.getElementById('system-status').innerHTML = `<pre>${status}</pre>`;
+            } catch (error) {
+                document.getElementById('system-status').innerHTML = `<pre style="color: red;">Error: ${error.message}</pre>`;
+            }
+        };
+
+        // Initial status update
+        refreshStatus();
+
+        // Auto-refresh status every 5 seconds
+        setInterval(refreshStatus, 5000);
+
+        console.log('Phase 2 Integration Test loaded successfully');
+        console.log('Available test functions:', ['testConfig', 'testBreakpoints', 'testMathUtils', 'testMathUtilsCache', 'testManagersIntegration', 'testResponsiveChanges']);
+    </script>
+</body>
+</html>

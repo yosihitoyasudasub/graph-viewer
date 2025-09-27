@@ -1,6 +1,7 @@
 import { GSAPGalleryViewer } from './core/gallery-viewer.js';
 import { DOMUtils } from './utils/dom-utils.js';
 import { GALLERY_CONFIG } from './core/config.js';
+import { SystemValidator } from './utils/system-validator.js';
 
 // Initialize gallery when DOM is ready
 DOMUtils.waitForDOM().then(() => {
@@ -38,6 +39,25 @@ DOMUtils.waitForDOM().then(() => {
 
       console.log('Gallery initialized successfully');
       console.log('Gallery stats:', gallery.getStats());
+
+      // Run system validation in development mode
+      setTimeout(async () => {
+        try {
+          const validator = new SystemValidator();
+          const results = await validator.runValidation();
+          console.log('=== SYSTEM VALIDATION RESULTS ===');
+          console.log(validator.generateReport());
+
+          if (results.status === 'ALL_TESTS_PASSED') {
+            console.log('✅ All Phase 3 integration tests passed!');
+          } else {
+            console.warn('⚠️ Some integration tests failed - check details above');
+          }
+        } catch (validationError) {
+          console.error('System validation failed:', validationError);
+        }
+      }, 2000); // Run after initial animations complete
+
     } else {
       console.warn('Gallery initialized with errors - some features may not work');
     }

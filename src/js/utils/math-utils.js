@@ -1,18 +1,60 @@
 import { GALLERY_CONFIG } from '../core/config.js';
 
 export class MathUtils {
+  // Cache for computed positions to improve performance
+  static _positionCache = new Map();
+  static _lastConfig = null;
+
+  /**
+   * Clear position cache when configuration changes
+   * @private
+   */
+  static _clearCacheIfNeeded() {
+    const currentConfig = GALLERY_CONFIG.current;
+    const configKey = `${currentConfig.centerX}_${currentConfig.centerY}_${currentConfig.radius}_${currentConfig.itemSize}`;
+
+    if (this._lastConfig !== configKey) {
+      this._positionCache.clear();
+      this._lastConfig = configKey;
+    }
+  }
+
+  /**
+   * Get current responsive configuration values
+   * @returns {Object} Current configuration
+   * @private
+   */
+  static _getCurrentConfig() {
+    return GALLERY_CONFIG.current;
+  }
+
   /**
    * Calculate center position on circle for given index (for connections)
    * @param {number} index - Item index
    * @param {number} totalItems - Total number of items (defaults to config value)
    * @returns {Object} Position object {x, y}
    */
-  static getItemPosition(index, totalItems = GALLERY_CONFIG.itemCount) {
-    const angle = (index / totalItems) * Math.PI * 2;
-    return {
-      x: GALLERY_CONFIG.centerX + GALLERY_CONFIG.radius * Math.cos(angle),
-      y: GALLERY_CONFIG.centerY + GALLERY_CONFIG.radius * Math.sin(angle)
+  static getItemPosition(index, totalItems) {
+    this._clearCacheIfNeeded();
+
+    const config = this._getCurrentConfig();
+    const itemCount = totalItems || config.itemCount;
+    const cacheKey = `pos_${index}_${itemCount}`;
+
+    // Return cached position if available
+    if (this._positionCache.has(cacheKey)) {
+      return this._positionCache.get(cacheKey);
+    }
+
+    const angle = (index / itemCount) * Math.PI * 2;
+    const position = {
+      x: config.centerX + config.radius * Math.cos(angle),
+      y: config.centerY + config.radius * Math.sin(angle)
     };
+
+    // Cache the computed position
+    this._positionCache.set(cacheKey, position);
+    return position;
   }
 
   /**
@@ -21,13 +63,28 @@ export class MathUtils {
    * @param {number} totalItems - Total number of items (defaults to config value)
    * @returns {Object} Position object {x, y}
    */
-  static getItemElementPosition(index, totalItems = GALLERY_CONFIG.itemCount) {
-    const centerPos = this.getItemPosition(index, totalItems);
-    const offset = GALLERY_CONFIG.itemSize / 2;
-    return {
+  static getItemElementPosition(index, totalItems) {
+    this._clearCacheIfNeeded();
+
+    const config = this._getCurrentConfig();
+    const itemCount = totalItems || config.itemCount;
+    const cacheKey = `elem_${index}_${itemCount}`;
+
+    // Return cached position if available
+    if (this._positionCache.has(cacheKey)) {
+      return this._positionCache.get(cacheKey);
+    }
+
+    const centerPos = this.getItemPosition(index, itemCount);
+    const offset = config.itemSize / 2;
+    const position = {
       x: centerPos.x - offset,
       y: centerPos.y - offset
     };
+
+    // Cache the computed position
+    this._positionCache.set(cacheKey, position);
+    return position;
   }
 
   /**
@@ -37,9 +94,11 @@ export class MathUtils {
    * @param {number} totalItems - Total number of items (defaults to config value)
    * @returns {boolean} True if diagonal pair
    */
-  static isDiagonalPair(index1, index2, totalItems = GALLERY_CONFIG.itemCount) {
+  static isDiagonalPair(index1, index2, totalItems) {
+    const config = this._getCurrentConfig();
+    const itemCount = totalItems || config.itemCount;
     const diff = Math.abs(index1 - index2);
-    return totalItems % 2 === 0 && diff === totalItems / 2;
+    return itemCount % 2 === 0 && diff === itemCount / 2;
   }
 
   /**
@@ -136,19 +195,22 @@ export class MathUtils {
    * Calculate arc control point for curved path
    * @param {Object} point1 - Start point {x, y}
    * @param {Object} point2 - End point {x, y}
-   * @param {number} heightRatio - Arc height as ratio of radius
+   * @param {number} heightRatio - Arc height as ratio of radius (optional)
    * @returns {Object} Control point {x, y}
    */
-  static getArcControlPoint(point1, point2, heightRatio = GALLERY_CONFIG.arcHeightRatio) {
+  static getArcControlPoint(point1, point2, heightRatio) {
+    const config = this._getCurrentConfig();
+    const ratio = heightRatio !== undefined ? heightRatio : config.arcHeightRatio;
+
     const midpoint = this.getMidpoint(point1, point2);
 
     const centerVector = {
-      x: GALLERY_CONFIG.centerX - midpoint.x,
-      y: GALLERY_CONFIG.centerY - midpoint.y
+      x: config.centerX - midpoint.x,
+      y: config.centerY - midpoint.y
     };
 
     const normalizedVector = this.normalizeVector(centerVector);
-    const arcHeight = GALLERY_CONFIG.radius * heightRatio;
+    const arcHeight = config.radius * ratio;
 
     return {
       x: midpoint.x + normalizedVector.x * arcHeight,
@@ -177,5 +239,55 @@ export class MathUtils {
   static roundToDecimals(value, decimals = 2) {
     const factor = Math.pow(10, decimals);
     return Math.round(value * factor) / factor;
+  }
+
+  /**
+   * Clear all cached positions (useful when configuration changes)
+   */
+  static clearCache() {
+    this._positionCache.clear();
+    this._lastConfig = null;
+  }
+
+  /**
+   * Get cache statistics for debugging
+   * @returns {Object} Cache statistics
+   */
+  static getCacheStats() {
+    return {
+      size: this._positionCache.size,
+      lastConfig: this._lastConfig,
+      entries: Array.from(this._positionCache.keys())
+    };
+  }
+
+  /**
+   * Precompute positions for all items (optimization for initial load)
+   * @param {number} totalItems - Total number of items
+   */
+  static precomputePositions(totalItems) {
+    const config = this._getCurrentConfig();
+    const itemCount = totalItems || config.itemCount;
+
+    for (let i = 0; i < itemCount; i++) {
+      this.getItemPosition(i, itemCount);
+      this.getItemElementPosition(i, itemCount);
+    }
+  }
+
+  /**
+   * Get current configuration values for external access
+   * @returns {Object} Current layout configuration
+   */
+  static getCurrentLayoutConfig() {
+    const config = this._getCurrentConfig();
+    return {
+      centerX: config.centerX,
+      centerY: config.centerY,
+      radius: config.radius,
+      itemSize: config.itemSize,
+      itemCount: config.itemCount,
+      breakpoint: config.breakpoint
+    };
   }
 }

@@ -1,9 +1,13 @@
-import { DOM_SELECTORS } from '../core/config.js';
+import { DOM_SELECTORS, GALLERY_CONFIG } from '../core/config.js';
 import { DOMUtils } from '../utils/dom-utils.js';
 
 export class EventManager {
   constructor() {
     this.eventListeners = new Map();
+    this.resizeCallbacks = new Map();
+    this.debounceTimer = null;
+    this.resizeDebounceDelay = 300; // ms
+    this.isResizeListenerSetup = false;
   }
 
   /**
@@ -14,6 +18,122 @@ export class EventManager {
     this.setupGalleryItemEvents(handlers.onItemClick);
     this.setupModalEvents(handlers.onModalClose);
     this.setupKeyboardEvents(handlers.onEscapeKey);
+
+    // Setup resize handling if handlers provided
+    if (handlers.onResize) {
+      this.setupResizeHandling(handlers.onResize);
+    }
+  }
+
+  /**
+   * Setup resize event handling with debouncing
+   * @param {Function} onResize - Resize handler function
+   */
+  setupResizeHandling(onResize) {
+    if (this.isResizeListenerSetup) {
+      console.warn('Resize listener already setup');
+      return;
+    }
+
+    const resizeHandler = () => {
+      // Clear existing timer
+      if (this.debounceTimer) {
+        clearTimeout(this.debounceTimer);
+      }
+
+      // Set new debounced timer
+      this.debounceTimer = setTimeout(() => {
+        try {
+          // Get current and previous breakpoints for comparison
+          const currentBreakpoint = GALLERY_CONFIG.getCurrentBreakpoint();
+
+          console.log(`EventManager: Window resized to ${window.innerWidth}x${window.innerHeight}`);
+          console.log(`EventManager: Current breakpoint: ${currentBreakpoint}`);
+
+          // Call main resize handler
+          if (typeof onResize === 'function') {
+            onResize(currentBreakpoint);
+          }
+
+          // Trigger all registered resize callbacks
+          this.triggerResizeCallbacks(currentBreakpoint);
+
+        } catch (error) {
+          console.error('EventManager: Error in resize handler:', error);
+        }
+      }, this.resizeDebounceDelay);
+    };
+
+    // Add resize listener to window
+    window.addEventListener('resize', resizeHandler);
+
+    // Store for cleanup
+    this.eventListeners.set('window-resize', {
+      element: window,
+      event: 'resize',
+      handler: resizeHandler
+    });
+
+    this.isResizeListenerSetup = true;
+    console.log('EventManager: Resize handling setup with', this.resizeDebounceDelay, 'ms debounce');
+  }
+
+  /**
+   * Register a callback for resize events
+   * @param {string} id - Unique identifier for the callback
+   * @param {Function} callback - Function to call on resize
+   * @param {Object} context - Optional context object
+   */
+  onResize(id, callback, context = null) {
+    if (typeof callback !== 'function') {
+      console.error('EventManager: Resize callback must be a function');
+      return;
+    }
+
+    this.resizeCallbacks.set(id, {
+      callback,
+      context,
+      registeredAt: Date.now()
+    });
+
+    console.log(`EventManager: Registered resize callback '${id}'`);
+  }
+
+  /**
+   * Remove a resize callback
+   * @param {string} id - Callback identifier to remove
+   */
+  offResize(id) {
+    const removed = this.resizeCallbacks.delete(id);
+    if (removed) {
+      console.log(`EventManager: Removed resize callback '${id}'`);
+    }
+    return removed;
+  }
+
+  /**
+   * Trigger all registered resize callbacks
+   * @param {string} currentBreakpoint - Current breakpoint name
+   * @private
+   */
+  triggerResizeCallbacks(currentBreakpoint) {
+    if (this.resizeCallbacks.size === 0) return;
+
+    console.log(`EventManager: Triggering ${this.resizeCallbacks.size} resize callbacks`);
+
+    this.resizeCallbacks.forEach((callbackData, id) => {
+      try {
+        const { callback, context } = callbackData;
+
+        if (context) {
+          callback.call(context, currentBreakpoint);
+        } else {
+          callback(currentBreakpoint);
+        }
+      } catch (error) {
+        console.error(`EventManager: Error in resize callback '${id}':`, error);
+      }
+    });
   }
 
   /**
@@ -243,13 +363,61 @@ export class EventManager {
   }
 
   /**
-   * Clean up all event listeners
+   * Get resize handling status
+   * @returns {Object} Resize system status
+   */
+  getResizeStatus() {
+    return {
+      isSetup: this.isResizeListenerSetup,
+      callbackCount: this.resizeCallbacks.size,
+      debounceDelay: this.resizeDebounceDelay,
+      callbacks: Array.from(this.resizeCallbacks.keys())
+    };
+  }
+
+  /**
+   * Update resize debounce delay
+   * @param {number} delay - New delay in milliseconds
+   */
+  setResizeDebounceDelay(delay) {
+    if (typeof delay === 'number' && delay >= 0) {
+      this.resizeDebounceDelay = delay;
+      console.log(`EventManager: Resize debounce delay updated to ${delay}ms`);
+    }
+  }
+
+  /**
+   * Force trigger resize callbacks (for testing)
+   */
+  forceResizeCallbacks() {
+    const currentBreakpoint = GALLERY_CONFIG.getCurrentBreakpoint();
+    console.log('EventManager: Force triggering resize callbacks');
+    this.triggerResizeCallbacks(currentBreakpoint);
+  }
+
+  /**
+   * Clean up all event listeners and resize callbacks
    */
   cleanup() {
+    // Clear debounce timer
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = null;
+    }
+
+    // Remove all event listeners
     this.eventListeners.forEach((listener, id) => {
       listener.element.removeEventListener(listener.event, listener.handler);
     });
     this.eventListeners.clear();
+
+    // Clear resize callbacks
+    this.resizeCallbacks.clear();
+
+    // Reset state
+    this.isResizeListenerSetup = false;
+
+    console.log('EventManager: Cleanup completed');
   }
 
   /**
@@ -258,5 +426,18 @@ export class EventManager {
    */
   getListenerCount() {
     return this.eventListeners.size;
+  }
+
+  /**
+   * Get comprehensive status of EventManager
+   * @returns {Object} Complete status information
+   */
+  getStatus() {
+    return {
+      totalListeners: this.eventListeners.size,
+      resizeSystem: this.getResizeStatus(),
+      isDebounceActive: !!this.debounceTimer,
+      listeners: Array.from(this.eventListeners.keys())
+    };
   }
 }

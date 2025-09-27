@@ -1,8 +1,14 @@
+import { GALLERY_CONFIG } from '../core/config.js';
+import { MathUtils } from '../utils/math-utils.js';
+
 export class GraphManager {
   constructor(imageCount) {
-    this.imageCount = imageCount;
+    this.imageCount = imageCount || GALLERY_CONFIG.itemCount;
     this.adjacencyMatrix = this.initializeMatrix();
     this.setupCompleteGraph();
+
+    // Bind config change handler for external calling
+    this._onConfigChange = this._handleConfigChange.bind(this);
   }
 
   /**
@@ -31,7 +37,8 @@ export class GraphManager {
       }
     }
 
-    console.log('Adjacency Matrix:', this.adjacencyMatrix);
+    console.log('GraphManager: Complete graph setup with', this.imageCount, 'nodes');
+    console.log('Current configuration:', MathUtils.getCurrentLayoutConfig());
   }
 
   /**
@@ -122,5 +129,98 @@ export class GraphManager {
    */
   getDegree(nodeIndex) {
     return this.getNeighbors(nodeIndex).length;
+  }
+
+  /**
+   * Handle configuration changes (e.g., responsive breakpoint changes)
+   * @param {Object} newBreakpoint - New breakpoint configuration
+   * @private
+   */
+  _handleConfigChange(newBreakpoint) {
+    console.log('GraphManager: Configuration changed to', newBreakpoint.name);
+
+    // Update item count if it changed
+    const newItemCount = GALLERY_CONFIG.itemCount;
+    if (newItemCount !== this.imageCount) {
+      console.log('GraphManager: Item count changed from', this.imageCount, 'to', newItemCount);
+      this.updateItemCount(newItemCount);
+    }
+  }
+
+  /**
+   * Update the number of items and rebuild the graph
+   * @param {number} newCount - New number of items
+   */
+  updateItemCount(newCount) {
+    if (newCount === this.imageCount) return;
+
+    this.imageCount = newCount;
+    this.adjacencyMatrix = this.initializeMatrix();
+    this.setupCompleteGraph();
+
+    console.log('GraphManager: Graph rebuilt with', newCount, 'nodes');
+  }
+
+  /**
+   * Get current item count
+   * @returns {number} Current number of items
+   */
+  getItemCount() {
+    return this.imageCount;
+  }
+
+  /**
+   * Get graph statistics
+   * @returns {Object} Graph statistics
+   */
+  getStats() {
+    const totalConnections = this.getConnections().length;
+    const possibleConnections = (this.imageCount * (this.imageCount - 1)) / 2;
+
+    return {
+      nodeCount: this.imageCount,
+      totalConnections,
+      possibleConnections,
+      density: possibleConnections > 0 ? totalConnections / possibleConnections : 0,
+      averageDegree: this.imageCount > 0 ? (totalConnections * 2) / this.imageCount : 0,
+      configuration: MathUtils.getCurrentLayoutConfig()
+    };
+  }
+
+  /**
+   * Get connections with position information
+   * @returns {Array<Object>} Array of connections with position data
+   */
+  getConnectionsWithPositions() {
+    const connections = this.getConnections();
+    return connections.map(conn => {
+      const fromPos = MathUtils.getItemPosition(conn.from, this.imageCount);
+      const toPos = MathUtils.getItemPosition(conn.to, this.imageCount);
+
+      return {
+        ...conn,
+        fromPosition: fromPos,
+        toPosition: toPos,
+        distance: MathUtils.getDistance(fromPos, toPos),
+        isDiagonal: MathUtils.isDiagonalPair(conn.from, conn.to, this.imageCount)
+      };
+    });
+  }
+
+  /**
+   * External method to handle configuration changes from GSAPGalleryViewer
+   * @param {string} breakpointName - New breakpoint name
+   */
+  handleConfigChange(breakpointName) {
+    this._handleConfigChange({ name: breakpointName });
+  }
+
+  /**
+   * Cleanup - remove event listeners
+   */
+  cleanup() {
+    // No longer directly managing event listeners
+    // GSAPGalleryViewer handles the coordination
+    console.log('GraphManager: Cleanup completed');
   }
 }

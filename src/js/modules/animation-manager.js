@@ -6,6 +6,106 @@ import { DOMUtils } from '../utils/dom-utils.js';
 export class AnimationManager {
   constructor() {
     this.setupGSAP();
+
+    // Bind config change handler for external calling
+    this._onConfigChange = this._handleConfigChange.bind(this);
+
+    // Cache current configuration
+    this._currentConfig = GALLERY_CONFIG.current;
+  }
+
+  /**
+   * Handle configuration changes (e.g., responsive breakpoint changes)
+   * @param {Object} newBreakpoint - New breakpoint configuration
+   * @private
+   */
+  _handleConfigChange(newBreakpoint) {
+    console.log('AnimationManager: Configuration changed to', newBreakpoint.name);
+
+    const newConfig = GALLERY_CONFIG.current;
+
+    // Update GSAP settings for new configuration
+    this._updateGSAPSettings(newConfig);
+
+    // Reposition all gallery items if needed
+    this._repositionGalleryItems();
+
+    // Update cached configuration
+    this._currentConfig = newConfig;
+  }
+
+  /**
+   * Update GSAP settings for current configuration
+   * @param {Object} config - Current configuration
+   * @private
+   */
+  _updateGSAPSettings(config) {
+    try {
+      const galleryContainer = document.querySelector('.gallery-container');
+      if (galleryContainer) {
+        gsap.set(galleryContainer, {
+          perspective: config.perspective
+        });
+      }
+
+      const galleryItems = document.querySelectorAll('.gallery-item');
+      if (galleryItems.length > 0) {
+        gsap.set(galleryItems, {
+          transformStyle: config.transformStyle
+        });
+      }
+
+      console.log('AnimationManager: GSAP settings updated for', config.breakpoint);
+    } catch (error) {
+      console.error('Error updating GSAP settings:', error);
+    }
+  }
+
+  /**
+   * Reposition all gallery items to new responsive positions
+   * @private
+   */
+  _repositionGalleryItems() {
+    try {
+      const galleryItems = document.querySelectorAll('.gallery-item');
+      if (galleryItems.length === 0) return;
+
+      const config = GALLERY_CONFIG.current;
+      const totalItems = Math.min(galleryItems.length, config.itemCount);
+
+      console.log('AnimationManager: Repositioning', totalItems, 'items for new layout');
+
+      galleryItems.forEach((item, index) => {
+        if (index >= totalItems) {
+          // Hide items that exceed the current item count
+          gsap.set(item, { opacity: 0, display: 'none' });
+          return;
+        }
+
+        if (!item) return;
+
+        try {
+          // Show item if it was hidden
+          gsap.set(item, { opacity: 1, display: 'block' });
+
+          // Calculate new position using current configuration
+          const position = MathUtils.getItemElementPosition(index, totalItems);
+
+          // Smoothly animate to new position
+          gsap.to(item, {
+            x: position.x,
+            y: position.y,
+            duration: config.animation.duration,
+            ease: config.animation.ease,
+            delay: index * config.animation.delay * 0.5 // Reduced delay for repositioning
+          });
+        } catch (repositionError) {
+          console.error(`Error repositioning item at index ${index}:`, repositionError);
+        }
+      });
+    } catch (error) {
+      console.error('Error repositioning gallery items:', error);
+    }
   }
 
   /**
@@ -13,14 +113,16 @@ export class AnimationManager {
    */
   setupGSAP() {
     try {
+      const config = GALLERY_CONFIG.current;
+
       const galleryContainer = document.querySelector('.gallery-container');
       if (!galleryContainer) {
         console.warn('Gallery container not found - 3D perspective will not be applied');
         return;
       }
 
-      gsap.set('.gallery-container', {
-        perspective: GALLERY_CONFIG.perspective
+      gsap.set(galleryContainer, {
+        perspective: config.perspective
       });
 
       const galleryItems = document.querySelectorAll('.gallery-item');
@@ -29,9 +131,11 @@ export class AnimationManager {
         return;
       }
 
-      gsap.set('.gallery-item', {
-        transformStyle: GALLERY_CONFIG.transformStyle
+      gsap.set(galleryItems, {
+        transformStyle: config.transformStyle
       });
+
+      console.log('AnimationManager: GSAP initialized with', config.breakpoint, 'configuration');
     } catch (error) {
       console.error('Error setting up GSAP initial configuration:', error);
     }
@@ -77,17 +181,29 @@ export class AnimationManager {
       return;
     }
 
-    const totalItems = galleryItems.length;
+    const config = GALLERY_CONFIG.current;
+    const totalItems = Math.min(galleryItems.length, config.itemCount);
 
     try {
+      let completedAnimations = 0;
+
       galleryItems.forEach((item, index) => {
+        if (index >= totalItems) {
+          // Hide items that exceed the current item count
+          gsap.set(item, { opacity: 0, display: 'none' });
+          return;
+        }
+
         if (!item) {
           console.warn(`Gallery item at index ${index} is null or undefined - skipping animation`);
           return;
         }
 
         try {
-          // Calculate final position on circle using MathUtils
+          // Show item if it was hidden
+          gsap.set(item, { opacity: 1, display: 'block' });
+
+          // Calculate final position on circle using MathUtils with current configuration
           const position = MathUtils.getItemElementPosition(index, totalItems);
           const finalX = position.x;
           const finalY = position.y;
@@ -96,11 +212,12 @@ export class AnimationManager {
             x: finalX,
             y: finalY,
             scale: 1,
-            duration: GALLERY_CONFIG.animation.duration,
-            delay: index * GALLERY_CONFIG.animation.delay,
-            ease: GALLERY_CONFIG.animation.ease,
+            duration: config.animation.duration,
+            delay: index * config.animation.delay,
+            ease: config.animation.ease,
             onComplete: () => {
-              if (index === galleryItems.length - 1) {
+              completedAnimations++;
+              if (completedAnimations === totalItems) {
                 if (typeof onCompleteCallback === 'function') {
                   onCompleteCallback();
                 } else {
@@ -132,17 +249,29 @@ export class AnimationManager {
     }
 
     try {
-      const centerOffset = GALLERY_CONFIG.itemSize / 2;
+      const config = GALLERY_CONFIG.current;
+      const centerOffset = config.itemSize / 2;
+      const totalItems = Math.min(galleryItems.length, config.itemCount);
+
       galleryItems.forEach((item, index) => {
+        if (index >= totalItems) {
+          // Hide items that exceed the current item count
+          gsap.set(item, { opacity: 0, display: 'none' });
+          return;
+        }
+
         if (!item) {
           console.warn(`Gallery item at index ${index} is null or undefined - skipping initial layout`);
           return;
         }
 
         try {
+          // Show item if it was hidden
+          gsap.set(item, { opacity: 1, display: 'block' });
+
           gsap.set(item, {
-            x: GALLERY_CONFIG.centerX - centerOffset,
-            y: GALLERY_CONFIG.centerY - centerOffset,
+            x: config.centerX - centerOffset,
+            y: config.centerY - centerOffset,
             rotation: 0,
             scale: 0
           });
@@ -150,6 +279,8 @@ export class AnimationManager {
           console.error(`Error setting initial layout for item at index ${index}:`, layoutError);
         }
       });
+
+      console.log('AnimationManager: Initial layout set for', totalItems, 'items');
     } catch (error) {
       console.error('Error in initial layout setup:', error);
     }
@@ -199,6 +330,7 @@ export class AnimationManager {
     }
 
     try {
+      const config = GALLERY_CONFIG.current;
       modalImage.src = imageUrl;
 
       // Verify modal content element exists
@@ -237,16 +369,16 @@ export class AnimationManager {
         modalContent.style.opacity = '1';
       }
 
-      // Animate clicked item with helper
+      // Animate clicked item with helper using current configuration
       if (clickedItem) {
         try {
-          AnimationHelpers.scaleToValue(clickedItem, GALLERY_CONFIG.animation.itemClickScale, {
-            duration: GALLERY_CONFIG.animation.itemClickDuration,
+          AnimationHelpers.scaleToValue(clickedItem, config.animation.itemClickScale, {
+            duration: config.animation.itemClickDuration,
             ease: "power2.inOut",
             onComplete: () => {
               try {
                 AnimationHelpers.scaleToValue(clickedItem, 1, {
-                  duration: GALLERY_CONFIG.animation.itemClickDuration,
+                  duration: config.animation.itemClickDuration,
                   ease: "power2.out"
                 });
               } catch (scaleBackError) {
@@ -314,17 +446,18 @@ export class AnimationManager {
     }
 
     try {
+      const config = GALLERY_CONFIG.current;
       const length = pathElement.getTotalLength();
 
       gsap.set(pathElement, {
         strokeDasharray: `${length} ${length}`,
         strokeDashoffset: length,
-        opacity: GALLERY_CONFIG.path.opacity.light // 薄い透明度を設定
+        opacity: config.path.opacity.light // 薄い透明度を設定
       });
 
       gsap.to(pathElement, {
         strokeDashoffset: 0,
-        duration: GALLERY_CONFIG.animation.pathStrokeDuration,
+        duration: config.animation.pathStrokeDuration,
         ease: "power2.out",
         delay: 0.5 + delay
       });
@@ -350,10 +483,12 @@ export class AnimationManager {
     }
 
     try {
+      const config = GALLERY_CONFIG.current;
+
       gsap.to(pathElement, {
         opacity: targetState.opacity,
-        duration: GALLERY_CONFIG.animation.modalDuration,
-        ease: GALLERY_CONFIG.animation.modalEase
+        duration: config.animation.modalDuration,
+        ease: config.animation.modalEase
       });
     } catch (error) {
       console.error('Error animating path state:', error);
@@ -372,13 +507,53 @@ export class AnimationManager {
     }
 
     try {
+      const config = GALLERY_CONFIG.current;
       const targetWidth = isHover ?
-        GALLERY_CONFIG.path.strokeWidth.hover :
-        GALLERY_CONFIG.path.strokeWidth.normal;
+        config.path.strokeWidth.hover :
+        config.path.strokeWidth.normal;
 
       AnimationHelpers.animateStrokeWidth(pathElement, targetWidth);
     } catch (error) {
       console.error('Error animating path hover:', error);
     }
+  }
+
+  /**
+   * Get current animation configuration
+   * @returns {Object} Current animation configuration
+   */
+  getCurrentAnimationConfig() {
+    const config = GALLERY_CONFIG.current;
+    return {
+      ...config.animation,
+      breakpoint: config.breakpoint,
+      itemSize: config.itemSize,
+      perspective: config.perspective
+    };
+  }
+
+  /**
+   * Force refresh animations (useful after manual configuration changes)
+   */
+  refresh() {
+    console.log('AnimationManager: Force refreshing animations');
+    this._repositionGalleryItems();
+  }
+
+  /**
+   * External method to handle configuration changes from GSAPGalleryViewer
+   * @param {string} breakpointName - New breakpoint name
+   */
+  handleConfigChange(breakpointName) {
+    this._handleConfigChange({ name: breakpointName });
+  }
+
+  /**
+   * Cleanup - remove event listeners
+   */
+  cleanup() {
+    // No longer directly managing event listeners
+    // GSAPGalleryViewer handles the coordination
+    console.log('AnimationManager: Cleanup completed');
   }
 }

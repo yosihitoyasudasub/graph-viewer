@@ -11,6 +11,99 @@ export class PathManager {
     if (!this.isEnabled) {
       console.warn('PathManager initialized without SVG element - connection lines will be disabled');
     }
+
+    // Bind config change handler for external calling
+    this._onConfigChange = this._handleConfigChange.bind(this);
+
+    // Cache current configuration
+    this._currentConfig = GALLERY_CONFIG.current;
+  }
+
+  /**
+   * Handle configuration changes (e.g., responsive breakpoint changes)
+   * @param {Object} newBreakpoint - New breakpoint configuration
+   * @private
+   */
+  _handleConfigChange(newBreakpoint) {
+    console.log('PathManager: Configuration changed to', newBreakpoint.name);
+
+    const newConfig = GALLERY_CONFIG.current;
+
+    // Update SVG viewBox if needed
+    this._updateSVGViewBox(newConfig);
+
+    // Rebuild all paths with new positions
+    this._rebuildAllPaths();
+
+    // Update cached configuration
+    this._currentConfig = newConfig;
+  }
+
+  /**
+   * Update SVG viewBox based on current configuration
+   * @param {Object} config - Current configuration
+   * @private
+   */
+  _updateSVGViewBox(config) {
+    if (!this.isEnabled || !this.connectionSvg) return;
+
+    try {
+      // Set SVG dimensions to match container
+      this.connectionSvg.setAttribute('width', config.containerWidth);
+      this.connectionSvg.setAttribute('height', config.containerHeight);
+      this.connectionSvg.setAttribute('viewBox', `0 0 ${config.containerWidth} ${config.containerHeight}`);
+
+      console.log('PathManager: SVG viewBox updated to', config.containerWidth, 'x', config.containerHeight);
+    } catch (error) {
+      console.error('Error updating SVG viewBox:', error);
+    }
+  }
+
+  /**
+   * Rebuild all paths with current configuration
+   * @private
+   */
+  _rebuildAllPaths() {
+    if (!this.isEnabled) return;
+
+    try {
+      // Store current states before rebuilding
+      const currentStates = new Map();
+      this.connectionLines.forEach(lineData => {
+        const key = `${lineData.from}-${lineData.to}`;
+        currentStates.set(key, lineData.state);
+      });
+
+      // Clear existing paths
+      this.clearConnections();
+
+      // Get current item count and recreate connections
+      const itemCount = GALLERY_CONFIG.itemCount;
+      const connections = [];
+
+      // Recreate complete graph connections
+      for (let i = 0; i < itemCount; i++) {
+        for (let j = i + 1; j < itemCount; j++) {
+          connections.push({ from: i, to: j });
+        }
+      }
+
+      // Recreate paths with stored states
+      this.createConnectionLines(connections);
+
+      // Restore previous states
+      this.connectionLines.forEach(lineData => {
+        const key = `${lineData.from}-${lineData.to}`;
+        if (currentStates.has(key)) {
+          lineData.state = currentStates.get(key);
+          this.applyPathVisualState(lineData);
+        }
+      });
+
+      console.log('PathManager: All paths rebuilt for new configuration');
+    } catch (error) {
+      console.error('Error rebuilding paths:', error);
+    }
   }
 
   /**
@@ -58,11 +151,14 @@ export class PathManager {
     }
 
     try {
-      const pos1 = MathUtils.getItemPosition(index1);
-      const pos2 = MathUtils.getItemPosition(index2);
+      const config = GALLERY_CONFIG.current;
+      const itemCount = config.itemCount;
+
+      const pos1 = MathUtils.getItemPosition(index1, itemCount);
+      const pos2 = MathUtils.getItemPosition(index2, itemCount);
 
       let pathData;
-      if (MathUtils.isDiagonalPair(index1, index2)) {
+      if (MathUtils.isDiagonalPair(index1, index2, itemCount)) {
         pathData = this.createLinearPath(pos1, pos2);
       } else {
         pathData = this.createArcPath(pos1, pos2);
@@ -99,13 +195,15 @@ export class PathManager {
    * @returns {SVGPathElement} Created path element
    */
   createPathElement(pathData, index1, index2) {
+    const config = GALLERY_CONFIG.current;
+
     const pathElement = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     pathElement.setAttribute('class', 'connection-line');
     pathElement.setAttribute('d', pathData);
     pathElement.setAttribute('fill', 'none');
-    pathElement.setAttribute('stroke', GALLERY_CONFIG.path.colors.pink);
-    pathElement.setAttribute('stroke-width', GALLERY_CONFIG.path.strokeWidth.normal);
-    pathElement.setAttribute('opacity', GALLERY_CONFIG.path.opacity.light); // 初期は薄い透明度
+    pathElement.setAttribute('stroke', config.path.colors.pink);
+    pathElement.setAttribute('stroke-width', config.path.strokeWidth.normal);
+    pathElement.setAttribute('opacity', config.path.opacity.light); // 初期は薄い透明度
     pathElement.setAttribute('data-from', index1);
     pathElement.setAttribute('data-to', index2);
 
@@ -129,21 +227,10 @@ export class PathManager {
    * @returns {string} SVG path data
    */
   createArcPath(pos1, pos2) {
-    const midX = (pos1.x + pos2.x) / 2;
-    const midY = (pos1.y + pos2.y) / 2;
+    const config = GALLERY_CONFIG.current;
+    const controlPoint = MathUtils.getArcControlPoint(pos1, pos2, config.arcHeightRatio);
 
-    const centerVectorX = GALLERY_CONFIG.centerX - midX;
-    const centerVectorY = GALLERY_CONFIG.centerY - midY;
-    const centerDistance = Math.sqrt(centerVectorX * centerVectorX + centerVectorY * centerVectorY);
-
-    const normalizedX = centerVectorX / centerDistance;
-    const normalizedY = centerVectorY / centerDistance;
-
-    const arcHeight = GALLERY_CONFIG.radius * GALLERY_CONFIG.arcHeightRatio;
-    const controlX = midX + normalizedX * arcHeight;
-    const controlY = midY + normalizedY * arcHeight;
-
-    return `M ${pos1.x} ${pos1.y} Q ${controlX} ${controlY} ${pos2.x} ${pos2.y}`;
+    return `M ${pos1.x} ${pos1.y} Q ${controlPoint.x} ${controlPoint.y} ${pos2.x} ${pos2.y}`;
   }
 
   /**
@@ -178,29 +265,33 @@ export class PathManager {
    */
   applyPathVisualState(lineData) {
     const element = lineData.element;
+    const config = GALLERY_CONFIG.current;
 
     switch(lineData.state) {
       case PATH_STATES.PINK_SOLID:
         element.removeAttribute('stroke-dasharray');
         AnimationHelpers.animatePathState(element, {
-          opacity: GALLERY_CONFIG.path.opacity.normal,
-          stroke: GALLERY_CONFIG.path.colors.pink
+          opacity: config.path.opacity.normal,
+          stroke: config.path.colors.pink,
+          strokeWidth: config.path.strokeWidth.normal
         });
         break;
 
       case PATH_STATES.GREEN_SOLID:
         element.removeAttribute('stroke-dasharray');
         AnimationHelpers.animatePathState(element, {
-          opacity: GALLERY_CONFIG.path.opacity.normal,
-          stroke: GALLERY_CONFIG.path.colors.green
+          opacity: config.path.opacity.normal,
+          stroke: config.path.colors.green,
+          strokeWidth: config.path.strokeWidth.normal
         });
         break;
 
       case PATH_STATES.TRANSPARENT:
         element.removeAttribute('stroke-dasharray');
         AnimationHelpers.animatePathState(element, {
-          opacity: GALLERY_CONFIG.path.opacity.light,
-          stroke: GALLERY_CONFIG.path.colors.pink
+          opacity: config.path.opacity.light,
+          stroke: config.path.colors.pink,
+          strokeWidth: config.path.strokeWidth.normal
         });
         break;
     }
@@ -217,6 +308,7 @@ export class PathManager {
     }
 
     try {
+      const config = GALLERY_CONFIG.current;
       const relevantPaths = this.connectionLines.filter(lineData =>
         lineData.from === itemIndex || lineData.to === itemIndex
       );
@@ -228,14 +320,23 @@ export class PathManager {
       const getOpacityFn = (pathData) => {
         if (isHighlight) {
           return pathData.state === PATH_STATES.TRANSPARENT ?
-            GALLERY_CONFIG.path.opacity.lightHighlight :
-            GALLERY_CONFIG.path.opacity.highlight;
+            config.path.opacity.lightHighlight :
+            config.path.opacity.highlight;
         } else {
           return pathData.state === PATH_STATES.TRANSPARENT ?
-            GALLERY_CONFIG.path.opacity.light :
-            GALLERY_CONFIG.path.opacity.normal;
+            config.path.opacity.light :
+            config.path.opacity.normal;
         }
       };
+
+      // Update stroke width for hover effect
+      relevantPaths.forEach(pathData => {
+        const strokeWidth = isHighlight ?
+          config.path.strokeWidth.hover :
+          config.path.strokeWidth.normal;
+
+        pathData.element.setAttribute('stroke-width', strokeWidth);
+      });
 
       AnimationHelpers.animateConnectionHighlight(relevantPaths, isHighlight, getOpacityFn);
     } catch (error) {
@@ -309,5 +410,45 @@ export class PathManager {
     } catch (error) {
       console.error('Error resetting paths:', error);
     }
+  }
+
+  /**
+   * Get current configuration information
+   * @returns {Object} Current configuration summary
+   */
+  getCurrentConfig() {
+    return {
+      ...MathUtils.getCurrentLayoutConfig(),
+      connectionCount: this.connectionLines.length,
+      svgEnabled: this.isEnabled
+    };
+  }
+
+  /**
+   * Force refresh of all paths (useful after manual configuration changes)
+   */
+  refresh() {
+    if (!this.isEnabled) return;
+
+    console.log('PathManager: Force refreshing all paths');
+    this._rebuildAllPaths();
+  }
+
+  /**
+   * External method to handle configuration changes from GSAPGalleryViewer
+   * @param {string} breakpointName - New breakpoint name
+   */
+  handleConfigChange(breakpointName) {
+    this._handleConfigChange({ name: breakpointName });
+  }
+
+  /**
+   * Cleanup - remove event listeners and clear connections
+   */
+  cleanup() {
+    // No longer directly managing event listeners
+    // GSAPGalleryViewer handles the coordination
+    this.clearConnections();
+    console.log('PathManager: Cleanup completed');
   }
 }

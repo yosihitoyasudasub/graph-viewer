@@ -4,17 +4,21 @@ import { AnimationManager } from '../modules/animation-manager.js';
 import { EventManager } from '../modules/event-manager.js';
 import { PathManager } from '../modules/path-manager.js';
 import { DOMUtils } from '../utils/dom-utils.js';
+import { ResponsiveConfigManager } from '../utils/responsive-config.js';
 
 export class GSAPGalleryViewer {
   constructor() {
     this.isInitialized = false;
     this.hasErrors = false;
+    this.isFirstInitialization = true;
 
     try {
       this.initializeProperties();
       this.initializeManagers();
+      this.setupResizeHandling();
       this.init();
       this.isInitialized = true;
+      console.log('GSAPGalleryViewer: Initialization completed successfully');
     } catch (error) {
       this.hasErrors = true;
       console.error('Gallery initialization failed:', error);
@@ -27,17 +31,26 @@ export class GSAPGalleryViewer {
    */
   initializeProperties() {
     try {
+      // Ensure ResponsiveConfigManager is initialized first
+      ResponsiveConfigManager.init();
+
+      // Get current configuration for initial setup
+      this.currentConfig = GALLERY_CONFIG.current;
+      console.log('GSAPGalleryViewer: Using configuration for', this.currentConfig.breakpoint);
+
       this.elements = DOMUtils.getRequiredElements();
     } catch (error) {
-      console.error('Failed to initialize gallery:', error.message);
+      console.error('Failed to initialize gallery properties:', error.message);
       throw error;
     }
 
-    this.itemCount = this.elements.galleryItems.length;
+    this.itemCount = Math.min(this.elements.galleryItems.length, this.currentConfig.itemCount);
 
     if (this.itemCount === 0) {
       throw new Error('No gallery items found');
     }
+
+    console.log(`GSAPGalleryViewer: Initialized with ${this.itemCount} items`);
   }
 
   /**
@@ -49,9 +62,152 @@ export class GSAPGalleryViewer {
       this.animationManager = new AnimationManager();
       this.eventManager = new EventManager();
       this.pathManager = new PathManager(this.elements.connectionSvg);
+
+      console.log('GSAPGalleryViewer: All managers initialized');
     } catch (error) {
       console.error('Failed to initialize managers:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Setup resize handling integration
+   */
+  setupResizeHandling() {
+    try {
+      // Register resize callback with EventManager
+      this.eventManager.onResize('gallery-viewer', (breakpointName) => {
+        this.handleResponsiveChange(breakpointName);
+      });
+
+      console.log('GSAPGalleryViewer: Resize handling configured');
+    } catch (error) {
+      console.error('Failed to setup resize handling:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Handle responsive configuration changes
+   * @param {string} breakpointName - New breakpoint name
+   */
+  handleResponsiveChange(breakpointName) {
+    try {
+      console.log(`GSAPGalleryViewer: Handling responsive change to ${breakpointName}`);
+
+      const newConfig = GALLERY_CONFIG.current;
+
+      // Notify all managers of the configuration change first
+      this.notifyManagersOfConfigChange(breakpointName);
+
+      // Check if significant changes require reinitialization
+      const needsRebuild = this.needsRebuild(newConfig);
+
+      if (needsRebuild) {
+        console.log('GSAPGalleryViewer: Significant changes detected, rebuilding gallery');
+        this.rebuildGallery(newConfig);
+      } else {
+        console.log('GSAPGalleryViewer: Minor changes, updating positions only');
+        this.updatePositions(newConfig);
+      }
+
+      this.currentConfig = newConfig;
+    } catch (error) {
+      console.error('GSAPGalleryViewer: Error handling responsive change:', error);
+    }
+  }
+
+  /**
+   * Notify all managers of configuration changes
+   * @param {string} breakpointName - New breakpoint name
+   */
+  notifyManagersOfConfigChange(breakpointName) {
+    try {
+      // Notify each manager in the correct order
+      if (this.graphManager && typeof this.graphManager.handleConfigChange === 'function') {
+        this.graphManager.handleConfigChange(breakpointName);
+      }
+
+      if (this.pathManager && typeof this.pathManager.handleConfigChange === 'function') {
+        this.pathManager.handleConfigChange(breakpointName);
+      }
+
+      if (this.animationManager && typeof this.animationManager.handleConfigChange === 'function') {
+        this.animationManager.handleConfigChange(breakpointName);
+      }
+
+      console.log(`GSAPGalleryViewer: All managers notified of ${breakpointName} change`);
+    } catch (error) {
+      console.error('GSAPGalleryViewer: Error notifying managers of config change:', error);
+    }
+  }
+
+  /**
+   * Check if gallery needs full rebuild
+   * @param {Object} newConfig - New configuration
+   * @returns {boolean} True if rebuild needed
+   */
+  needsRebuild(newConfig) {
+    if (!this.currentConfig) return true;
+
+    // Check for item count changes
+    const newItemCount = Math.min(this.elements.galleryItems.length, newConfig.itemCount);
+    if (newItemCount !== this.itemCount) {
+      return true;
+    }
+
+    // Check for major layout changes
+    const containerSizeChanged =
+      this.currentConfig.containerWidth !== newConfig.containerWidth ||
+      this.currentConfig.containerHeight !== newConfig.containerHeight;
+
+    return containerSizeChanged;
+  }
+
+  /**
+   * Rebuild gallery for significant changes
+   * @param {Object} newConfig - New configuration
+   */
+  rebuildGallery(newConfig) {
+    try {
+      // Update item count
+      this.itemCount = Math.min(this.elements.galleryItems.length, newConfig.itemCount);
+
+      // Clear existing connections
+      this.pathManager.clearConnections();
+
+      // Update managers
+      this.graphManager.updateItemCount(this.itemCount);
+
+      // Re-setup initial layout with new configuration
+      this.animationManager.setupInitialLayout(this.elements.galleryItems);
+
+      // Re-animate items to new positions
+      this.animationManager.animateGalleryItems(
+        this.elements.galleryItems,
+        () => {
+          // Re-setup connections after animation
+          this.setupConnectionLines();
+        }
+      );
+
+      console.log('GSAPGalleryViewer: Gallery rebuilt successfully');
+    } catch (error) {
+      console.error('GSAPGalleryViewer: Error rebuilding gallery:', error);
+    }
+  }
+
+  /**
+   * Update positions for minor changes
+   * @param {Object} newConfig - New configuration
+   */
+  updatePositions(newConfig) {
+    try {
+      // Managers will handle their own updates through their resize callbacks
+      // This method is for any additional gallery-level position updates
+      console.log('GSAPGalleryViewer: Positions updated for new configuration');
+    } catch (error) {
+      console.error('GSAPGalleryViewer: Error updating positions:', error);
     }
   }
 
@@ -97,7 +253,8 @@ export class GSAPGalleryViewer {
     this.eventManager.setupEventListeners({
       onItemClick: (item, index) => this.openModal(item),
       onModalClose: () => this.closeModal(),
-      onEscapeKey: () => this.closeModal()
+      onEscapeKey: () => this.closeModal(),
+      onResize: (breakpointName) => this.handleResponsiveChange(breakpointName)
     });
 
     // Setup reset button listener
@@ -156,7 +313,8 @@ export class GSAPGalleryViewer {
   animateConnectionLines() {
     const connectionLines = this.pathManager.getConnectionLines();
     connectionLines.forEach((lineData, index) => {
-      this.animationManager.animatePathStroke(lineData.element, index * GALLERY_CONFIG.animation.pathStrokeDelay);
+      const config = GALLERY_CONFIG.current;
+      this.animationManager.animatePathStroke(lineData.element, index * config.animation.pathStrokeDelay);
     });
   }
 
@@ -260,15 +418,42 @@ export class GSAPGalleryViewer {
   }
 
   /**
-   * Get gallery statistics
+   * Get comprehensive gallery statistics
    * @returns {Object} Statistics object
    */
   getStats() {
     return {
       itemCount: this.itemCount,
+      maxItemCount: this.currentConfig.itemCount,
       connectionCount: this.pathManager.getConnectionCount(),
-      eventListenerCount: this.eventManager.getListenerCount()
+      eventListenerCount: this.eventManager.getListenerCount(),
+      currentBreakpoint: this.currentConfig.breakpoint,
+      isInitialized: this.isInitialized,
+      hasErrors: this.hasErrors,
+      managers: {
+        graph: this.graphManager.getStats(),
+        animation: this.animationManager.getCurrentAnimationConfig(),
+        events: this.eventManager.getStatus(),
+        paths: this.pathManager.getCurrentConfig()
+      }
     };
+  }
+
+  /**
+   * Get current configuration
+   * @returns {Object} Current responsive configuration
+   */
+  getCurrentConfig() {
+    return this.currentConfig;
+  }
+
+  /**
+   * Force refresh gallery (useful for manual testing)
+   */
+  refresh() {
+    console.log('GSAPGalleryViewer: Force refresh requested');
+    const currentBreakpoint = GALLERY_CONFIG.getCurrentBreakpoint();
+    this.handleResponsiveChange(currentBreakpoint);
   }
 
   /**
@@ -288,6 +473,15 @@ export class GSAPGalleryViewer {
             <h3>Gallery Not Available</h3>
             <p>The gallery could not be loaded properly. Please check the console for error details.</p>
             <p>Ensure all required files are loaded and the DOM structure is correct.</p>
+            <details style="margin-top: 20px; text-align: left; max-width: 400px; margin-left: auto; margin-right: auto;">
+              <summary>Error Details</summary>
+              <pre style="font-size: 12px; background: #f5f5f5; padding: 10px; border-radius: 4px; overflow: auto;">
+Current Configuration: ${this.currentConfig ? this.currentConfig.breakpoint : 'Not available'}
+Item Count: ${this.itemCount || 'Unknown'}
+Has Errors: ${this.hasErrors}
+Initialized: ${this.isInitialized}
+              </pre>
+            </details>
           </div>
         `;
       }
@@ -308,12 +502,34 @@ export class GSAPGalleryViewer {
    * Cleanup resources
    */
   destroy() {
-    if (this.eventManager) {
-      this.eventManager.cleanup();
+    console.log('GSAPGalleryViewer: Starting cleanup');
+
+    try {
+      // Cleanup managers in reverse order of initialization
+      if (this.pathManager) {
+        this.pathManager.cleanup();
+      }
+
+      if (this.eventManager) {
+        this.eventManager.cleanup();
+      }
+
+      if (this.animationManager) {
+        this.animationManager.cleanup();
+      }
+
+      if (this.graphManager) {
+        this.graphManager.cleanup();
+      }
+
+      // Reset state
+      this.isInitialized = false;
+      this.hasErrors = false;
+      this.currentConfig = null;
+
+      console.log('GSAPGalleryViewer: Cleanup completed successfully');
+    } catch (error) {
+      console.error('GSAPGalleryViewer: Error during cleanup:', error);
     }
-    if (this.pathManager) {
-      this.pathManager.clearConnections();
-    }
-    console.log('Gallery viewer destroyed');
   }
 }
